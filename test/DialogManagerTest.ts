@@ -16,14 +16,14 @@ describe("DialogManager tests", function() {
             .create();
 
         let request = virtualAlexa.request().intent("PetMatchIntent").slot("size", "big");
-        assert.equal(request.json().request.dialogState, "STARTED");
-        assert.equal(request.json().request.intent.slots.size.value, "big");
-        assert.equal(request.json().request.intent.slots.size.resolutions.resolutionsPerAuthority.length, 1);
+        assert.equal(request.json.request.dialogState, "STARTED");
+        assert.equal(request.json.request.intent.slots.size.value, "big");
+        assert.equal(request.json.request.intent.slots.size.resolutions.resolutionsPerAuthority.length, 1);
         virtualAlexa.call(request).then((response: SkillResponse) => {
             let request = virtualAlexa.request().intent("PetMatchIntent").slot("temperament", "watch");
-            assert.equal(request.json().request.intent.slots.size.value, "big");
-            assert.equal(request.json().request.intent.slots.temperament.value, "watch");
-            assert.equal(request.json().request.intent.slots.temperament.resolutions.resolutionsPerAuthority.length, 1);
+            assert.equal(request.json.request.intent.slots.size.value, "big");
+            assert.equal(request.json.request.intent.slots.temperament.value, "watch");
+            assert.equal(request.json.request.intent.slots.temperament.resolutions.resolutionsPerAuthority.length, 1);
             return virtualAlexa.call(request);
         }).then(() => {
             done();

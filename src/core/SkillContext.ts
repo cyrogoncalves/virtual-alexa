@@ -21,9 +21,9 @@ export class SkillContext {
     private readonly _apiEndpoint: string;
     private readonly _device: Device;
     /** @internal */
-    private readonly _dialogManager: DialogManager;
+    public readonly dialogManager: DialogManager;
     /** @internal */
-    private readonly _interactionModel: InteractionModel;
+    public readonly interactionModel: InteractionModel;
     private readonly _user: User;
     private _session: SkillSession;
 
@@ -36,8 +36,8 @@ export class SkillContext {
         this._apiAccessToken = "virtualAlexa.accessToken." + uuid.v4();
         this._apiEndpoint = "https://api.amazonalexa.com";
         this._audioPlayer = audioPlayer;
-        this._interactionModel = interactionModel;
-        this._dialogManager = new DialogManager(this);
+        this.interactionModel = interactionModel;
+        this.dialogManager = new DialogManager(this);
         this._device = new Device();
         this._user = new User();
     }
@@ -60,11 +60,6 @@ export class SkillContext {
         return this._device;
     }
 
-    /** @internal */
-    get interactionModel(): InteractionModel {
-        return this._interactionModel;
-    }
-
     public user(): User {
         return this._user;
     }
@@ -81,11 +76,6 @@ export class SkillContext {
         return this._locale || "en-US";
     }
 
-    /** @internal */
-    public dialogManager(): DialogManager {
-        return this._dialogManager;
-    }
-
     public audioPlayer(): AudioPlayer {
         return this._audioPlayer;
     }
@@ -99,7 +89,7 @@ export class SkillContext {
     }
 
     public endSession(): void {
-        this.dialogManager().reset();
+        this.dialogManager.reset();
         this._session = undefined;
     }
 

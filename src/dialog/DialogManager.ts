@@ -79,7 +79,7 @@ export class DialogManager {
 
     /** @internal */
     public handleRequest(request: SkillRequest): void {
-        const intentName = request.json().request.intent.name;
+        const intentName = request.json.request.intent.name;
         if (this.context.interactionModel.dialogIntent(intentName)) {
             // Set the dialog intent here - it may not be set by the skill in its response
             this._dialogIntent = this.context.interactionModel.dialogIntent(intentName);
@@ -90,10 +90,10 @@ export class DialogManager {
             }
 
             // Update the request JSON to have the correct dialog state
-            request.json().request.dialogState = this._dialogState;
+            request.json.request.dialogState = this._dialogState;
 
             // Update the state of the slots in the dialog manager
-            this.context.dialogManager().updateSlotStates(request.json().request.intent.slots);
+            this.context.dialogManager.updateSlotStates(request.json.request.intent.slots);
         }
     }
 

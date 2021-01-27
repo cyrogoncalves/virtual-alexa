@@ -1,6 +1,5 @@
 import { AudioPlayer } from "../audioPlayer/AudioPlayer";
 import { AddressAPI } from "../external/AddressAPI";
-import { DialogManager } from "../dialog/DialogManager";
 import { DynamoDB } from "../external/DynamoDB";
 import { LocalSkillInteractor } from "../impl/LocalSkillInteractor";
 import { RemoteSkillInteractor } from "../impl/RemoteSkillInteractor";
@@ -66,10 +65,6 @@ export class VirtualAlexa {
         return this._context;
     }
 
-    public dialogManager(): DialogManager {
-        return this._context.dialogManager();
-    }
-
     public dynamoDB() {
         return this._dynamoDB;
     }
@@ -100,16 +95,11 @@ export class VirtualAlexa {
     /**
      * Sends the specified intent, with the optional map of slot values
      * @param {string} intentName
-     * @param {{[p: string]: string}} slots
+     * @param {[id: string]: string} slots
      * @returns {SkillRequest}
      */
     public intend(intentName: string, slots?: {[id: string]: string}): Promise<SkillResponse> {
         return this.call(new SkillRequest(this).intent(intentName).slots(slots));
-    }
-
-    /** @internal */
-    public interactor() {
-        return this._interactor;
     }
 
     /**
@@ -145,7 +135,7 @@ export class VirtualAlexa {
 
     /**
      * Sends the specified utterance as an Intent request to the skill
-     * @param {string} utterance
+     * @param {string} utteranceString
      * @returns {SkillRequest}
      */
     public utter(utteranceString: string): Promise<SkillResponse> {
@@ -154,7 +144,7 @@ export class VirtualAlexa {
         }
 
         let resolvedUtterance = utteranceString;
-        const launchRequestOrUtter = this.parseLaunchRequest(utteranceString);
+        const launchRequestOrUtter = VirtualAlexa.parseLaunchRequest(utteranceString);
         if (launchRequestOrUtter === true) {
             return this.launch();
         } else if (launchRequestOrUtter) {
@@ -174,15 +164,13 @@ export class VirtualAlexa {
         return this.call(request);
     }
 
-    
-    private parseLaunchRequest(utter: string): string | boolean {
+    private static parseLaunchRequest(utter: string): string | boolean {
         const launchRequestRegex = /(ask|open|launch|talk to|tell).*/i;
         if (launchRequestRegex.test(utter)) {
             const launchAndUtterRegex = /^(?:ask|open|launch|talk to|tell) .* to (.*)/i;
             const result = launchAndUtterRegex.exec(utter);
             return result?.length ? result[1] : true;
         }
-
         return undefined;
     }
 }

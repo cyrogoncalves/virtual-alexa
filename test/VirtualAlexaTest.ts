@@ -881,8 +881,8 @@ describe("Request Builder tests", () => {
         const request = virtualAlexa.request().intent("Play")
             .set("request.path1", "value")
             .set("request.array[0].prop", "value");
-        assert.equal(request.json().request.path1, "value");
-        assert.equal(request.json().request.array[0].prop, "value");
+        assert.equal(request.json.request.path1, "value");
+        assert.equal(request.json.request.array[0].prop, "value");
     });
 });
 
@@ -913,10 +913,10 @@ describe("Connection Response tests", () => {
             "ProductId",
             "MyToken")
         
-        assert.equal(request.json().request.type, "Connections.Response");
-        assert.equal(request.json().request.payload.productId, "ProductId");
-        assert.equal(request.json().request.payload.purchaseResult, "DECLINED");
-        assert.equal(request.json().request.status.code, 200);
-        assert.equal(request.json().request.status.message, "OK");
+        assert.equal(request.json.request.type, "Connections.Response");
+        assert.equal(request.json.request.payload.productId, "ProductId");
+        assert.equal(request.json.request.payload.purchaseResult, "DECLINED");
+        assert.equal(request.json.request.status.code, 200);
+        assert.equal(request.json.request.status.message, "OK");
     });
 });

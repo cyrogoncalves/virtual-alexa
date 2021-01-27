@@ -20,21 +20,20 @@ export abstract class SkillInteractor {
     public async callSkill(serviceRequest: SkillRequest): Promise<SkillResponse> {
         // When the user utters an intent, we suspend for it
         // We do this first to make sure everything is in the right state for what comes next
-        if (serviceRequest.json().request.intent 
+        if (serviceRequest.json.request.intent
             &&this._alexa.context().device().audioPlayerSupported() 
             && this._alexa.context().audioPlayer().isPlaying()) {
             await this._alexa.context().audioPlayer().suspend();
         }
 
-        const requestJSON = serviceRequest.json();
         if (this.requestFilter) {
-            this.requestFilter(requestJSON);
+            this.requestFilter(serviceRequest.json);
         }
 
-        const result: any = await this.invoke(requestJSON);
+        const result: any = await this.invoke(serviceRequest.json);
 
         // If this was a session ended request, end the session in our internal state
-        if (requestJSON.request.type === "SessionEndedRequest") {
+        if (serviceRequest.json.request.type === "SessionEndedRequest") {
             this._alexa.context().endSession();
         }
 
@@ -50,11 +49,11 @@ export abstract class SkillInteractor {
         if (result.response !== undefined && result.response.directives !== undefined) {
             await this._alexa.context().audioPlayer().directivesReceived(result.response.directives);
             // Update the dialog manager based on the results
-            this._alexa.context().dialogManager().handleDirective(result);
+            this._alexa.context().dialogManager.handleDirective(result);
         }
 
         // Resume the audio player, if suspended
-        if (serviceRequest.json().request.intent 
+        if (serviceRequest.json.request.intent
             && this._alexa.context().device().audioPlayerSupported() 
             && this._alexa.context().audioPlayer().suspended()) {
             await this._alexa.context().audioPlayer().resume();

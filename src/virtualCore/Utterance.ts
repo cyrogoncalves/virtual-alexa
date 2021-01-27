@@ -1,14 +1,14 @@
 /**
  * Turns a phrase into an intent
  */
-import {IModel} from "./IModel";
-import {SamplePhrase} from "./SampleUtterances";
+import { SamplePhrase } from "./SampleUtterances";
+import { InteractionModel } from '../model/InteractionModel';
 
 export class Utterance {
   public matchedSample: SamplePhrase;
   private slots: string[];
 
-  public constructor(public interactionModel: IModel, public phrase: string) {
+  public constructor(public interactionModel: InteractionModel, public phrase: string) {
     this.matchIntent();
   }
 
@@ -54,8 +54,7 @@ export class Utterance {
   private matchIntent(): void {
     const matches = [];
     for (const intent of this.interactionModel.intentSchema.intents()) {
-      const intentName = intent.name;
-      for (const sample of this.interactionModel.sampleUtterances.samplesForIntent(intentName)) {
+      for (const sample of this.interactionModel.sampleUtterances.samplesForIntent(intent.name)) {
         const sampleTest = sample.matchesUtterance(this.phrase);
         if (sampleTest.matches()) {
           matches.push(sampleTest);

@@ -26,7 +26,7 @@ export class SlotValue {
         const slotType = context.interactionModel.slotTypes.slotType(slot.type);
         // We only include the entity resolution for builtin types if they have been extended
         //  and for all custom slot types
-        if (slotType && slotType.isCustom()) {
+        if (slotType?.isCustom()) {
             const authority = "amzn1.er-authority.echo-sdk." + context.applicationID() + "." + slotType.name;
 
             this.resolutions = { resolutionsPerAuthority: [] };
