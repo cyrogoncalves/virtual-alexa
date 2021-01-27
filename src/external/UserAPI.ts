@@ -37,7 +37,7 @@ export class UserAPI {
             nock.activate();
         }
 
-        const baseURL = this.context.apiEndpoint();
+        const baseURL = this.context.apiEndpoint;
         let scope = nock(baseURL)
             .persist();
 

@@ -21,52 +21,25 @@ export class VirtualAlexa {
 
     /** @internal */
     private readonly _interactor: SkillInteractor;
-    /** @internal */
-    private readonly _addressAPI: AddressAPI;
-    /** @internal */
-    private readonly _userAPI: UserAPI;
-    /** @internal */
-    private readonly _context: SkillContext = null;
-    /** @internal */
-    private readonly _dynamoDB: DynamoDB;
+    public readonly addressAPI: AddressAPI;
+    public readonly userAPI: UserAPI;
+    public readonly context: SkillContext;
+    public readonly dynamoDB: DynamoDB;
     
     /** @internal */
     public constructor(interactor: SkillInteractor, model: InteractionModel, locale: string, applicationID?: string) {
         const audioPlayer = new AudioPlayer(this);
-        this._context = new SkillContext(model, audioPlayer, locale, applicationID);
-        this._context.newSession();
-        
+        this.context = new SkillContext(model, audioPlayer, locale, applicationID);
         this._interactor = interactor;
-        this._addressAPI = new AddressAPI(this._context);
-        this._userAPI = new UserAPI(this._context);
-        this._dynamoDB = new DynamoDB();
-    }
-
-    public addressAPI() {
-        return this._addressAPI;
-    }
-
-    public userAPI() {
-        return this._userAPI;
-    }
-
-    // Provides access to the AudioPlayer object, for sending audio requests
-    public audioPlayer(): AudioPlayer {
-        return this._context.audioPlayer();
+        this.addressAPI = new AddressAPI(this.context);
+        this.userAPI = new UserAPI(this.context);
+        this.dynamoDB = new DynamoDB();
     }
 
     // Invoke virtual alexa with constructed skill request
     // @internal
     public call(skillRequest: SkillRequest): Promise<SkillResponse> {
         return this._interactor.callSkill(skillRequest);
-    }
-
-    public context(): SkillContext {
-        return this._context;
-    }
-
-    public dynamoDB() {
-        return this._dynamoDB;
     }
 
     /**
@@ -89,6 +62,11 @@ export class VirtualAlexa {
      */
     public filter(requestFilter: RequestFilter): VirtualAlexa {
         this._interactor.filter(requestFilter);
+        return this;
+    }
+
+    public resetFilter(): VirtualAlexa {
+        this._interactor.filter(undefined);
         return this;
     }
 
@@ -128,11 +106,6 @@ export class VirtualAlexa {
         return this.call(new SkillRequest(this).launch());
     }
 
-    public resetFilter(): VirtualAlexa {
-        this._interactor.filter(undefined);
-        return this;
-    }
-
     /**
      * Sends the specified utterance as an Intent request to the skill
      * @param {string} utteranceString
@@ -151,7 +124,7 @@ export class VirtualAlexa {
             resolvedUtterance = launchRequestOrUtter;
         }
 
-        const utterance = new Utterance(this._context.interactionModel, resolvedUtterance);
+        const utterance = new Utterance(this.context.interactionModel, resolvedUtterance);
         // If we don't match anything, we use the default utterance - simple algorithm for this
         if (!utterance.matched()) {
             throw new Error("Unable to match utterance: " + resolvedUtterance

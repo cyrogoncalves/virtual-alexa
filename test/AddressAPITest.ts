@@ -35,7 +35,7 @@ describe("Test address API mocks", function() {
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
 
-        virtualAlexa.addressAPI().returnsFullAddress({
+        virtualAlexa.addressAPI.returnsFullAddress({
             addressLine1: "address line 1",
             addressLine2: "address line 2",
             addressLine3: "address line 3",
@@ -78,7 +78,7 @@ describe("Test address API mocks", function() {
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
 
-        virtualAlexa.addressAPI().returnsCountryAndPostalCode({
+        virtualAlexa.addressAPI.returnsCountryAndPostalCode({
             countryCode: "country code",
             postalCode: "postal",
         });
@@ -108,7 +108,7 @@ describe("Test address API mocks", function() {
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
 
-        virtualAlexa.addressAPI().returnsCountryAndPostalCode({
+        virtualAlexa.addressAPI.returnsCountryAndPostalCode({
             countryCode: "country code 1",
             postalCode: "postal",
         });
@@ -121,7 +121,7 @@ describe("Test address API mocks", function() {
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
 
-        virtualAlexa.addressAPI().returnsCountryAndPostalCode({
+        virtualAlexa.addressAPI.returnsCountryAndPostalCode({
             countryCode: "country code 2",
             postalCode: "postal",
         });
@@ -146,7 +146,7 @@ describe("Test address API mocks", function() {
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
 
-        virtualAlexa.addressAPI().insufficientPermissions();
+        virtualAlexa.addressAPI.insufficientPermissions();
 
         virtualAlexa.launch();
     });

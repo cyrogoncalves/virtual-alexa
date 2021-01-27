@@ -20,7 +20,7 @@ describe("VirtualAlexa Tests Using Files", function() {
         assert.isDefined(response);
 
         assert.isTrue(response.success);
-        assert.equal(virtualAlexa.context().locale(), "en-US");
+        assert.equal(virtualAlexa.context.locale(), "en-US");
         assert.equal(requestToCheck.request.locale, "en-US");
 
     });
@@ -42,7 +42,7 @@ describe("VirtualAlexa Tests Using Files", function() {
         assert.isDefined(response);
 
         assert.isTrue(response.success);
-        assert.equal(virtualAlexa.context().locale(), "en-US");
+        assert.equal(virtualAlexa.context.locale(), "en-US");
         assert.equal(requestToCheck.request.locale, "en-US");
 
     });
@@ -63,7 +63,7 @@ describe("VirtualAlexa Tests Using Files", function() {
         assert.isDefined(response);
 
         assert.isTrue(response.success);
-        assert.equal(virtualAlexa.context().locale(), "de-DE");
+        assert.equal(virtualAlexa.context.locale(), "de-DE");
         assert.equal(requestToCheck.request.locale, "de-DE");
     });
 
@@ -601,10 +601,10 @@ describe("VirtualAlexa Tests Using JSON", function() {
                 .sampleUtterances(sampleUtterances)
                 .intentSchema(intentSchema)
                 .create();
-            virtualAlexa.context().device().setID("testID");
-            virtualAlexa.context().device().audioPlayerSupported(true);
-            virtualAlexa.context().device().displaySupported(true);
-            virtualAlexa.context().device().videoAppSupported(true);
+            virtualAlexa.context.device.setID("testID");
+            virtualAlexa.context.device.audioPlayerSupported(true);
+            virtualAlexa.context.device.displaySupported(true);
+            virtualAlexa.context.device.videoAppSupported(true);
 
             await virtualAlexa.filter((request) => {
                 assert.isDefined(request.context.System.device.deviceId);
@@ -625,8 +625,8 @@ describe("VirtualAlexa Tests Using JSON", function() {
                 .sampleUtterances(sampleUtterances)
                 .intentSchema(intentSchema)
                 .create();
-            virtualAlexa.context().device().setID("testID");
-            virtualAlexa.context().device().audioPlayerSupported(false);
+            virtualAlexa.context.device.setID("testID");
+            virtualAlexa.context.device.audioPlayerSupported(false);
 
             await virtualAlexa.filter((request) => {
                 assert.isUndefined(request.context.System.device.supportedInterfaces.AudioPlayer);
@@ -717,7 +717,7 @@ describe("VirtualAlexa Tests Using JSON", function() {
 
             virtualAlexa.launch().then(() => {
                 virtualAlexa.utter("stop").then(() => {
-                    assert.isUndefined(virtualAlexa.context().session());
+                    assert.isUndefined(virtualAlexa.context.session());
                     done();
                 });
             });
@@ -839,9 +839,9 @@ describe("Echo Show Tests", () => {
             .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
-        virtualAlexa.context().device().setID("testID");
-        virtualAlexa.context().device().audioPlayerSupported(false);
-        virtualAlexa.context().device().displaySupported(true);
+        virtualAlexa.context.device.setID("testID");
+        virtualAlexa.context.device.audioPlayerSupported(false);
+        virtualAlexa.context.device.displaySupported(true);
 
         const response = await virtualAlexa.utter("play now") as SkillResponse;
         assert.isDefined(response.display());
@@ -858,9 +858,9 @@ describe("Echo Show Tests", () => {
             .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
-        virtualAlexa.context().device().setID("testID");
-        virtualAlexa.context().device().audioPlayerSupported(false);
-        virtualAlexa.context().device().displaySupported(true);
+        virtualAlexa.context.device.setID("testID");
+        virtualAlexa.context.device.audioPlayerSupported(false);
+        virtualAlexa.context.device.displaySupported(true);
 
         await virtualAlexa.filter((request) => {
             assert.isDefined(request.context.Display);

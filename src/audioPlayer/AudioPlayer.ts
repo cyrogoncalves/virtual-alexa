@@ -1,5 +1,4 @@
 import {RequestType, SessionEndedReason, SkillRequest} from "../core/SkillRequest";
-import {SkillInteractor} from "../impl/SkillInteractor";
 import {AudioItem} from "./AudioItem";
 import { VirtualAlexa } from "../core/VirtualAlexa";
 
@@ -21,9 +20,6 @@ export class AudioPlayer {
 
     /** @internal */
     private static DIRECTIVE_STOP = "AudioPlayer.Stop";
-
-    /** @internal */
-    private static DIRECTIVE_CLEAR_QUEUE = "AudioPlayer.ClearQueue";
 
     /** @internal */
     private static PLAY_BEHAVIOR_REPLACE_ALL = "REPLACE_ALL";

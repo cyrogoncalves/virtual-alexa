@@ -1,6 +1,6 @@
-import {assert} from "chai";
-import {SkillResponse} from "../src/core/SkillResponse";
-import {VirtualAlexa} from "../src/core/VirtualAlexa";
+import { assert } from "chai";
+import { SkillResponse } from "../src/core/SkillResponse";
+import { VirtualAlexa } from "../src/core/VirtualAlexa";
 
 const interactionModel = {
     intents: [
@@ -50,7 +50,7 @@ describe("AudioPlayer launches and plays a track", function() {
             await virtualAlexa.launch();
             const reply = await virtualAlexa.utter("play") as SkillResponse;
             assert.include(reply.response.directives[0].audioItem.stream.url, "episode-013");
-            assert.isTrue(virtualAlexa.audioPlayer().isPlaying());
+            assert.isTrue(virtualAlexa.context.audioPlayer.isPlaying());
         } catch (e) {
             console.log(e);
         }

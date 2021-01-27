@@ -58,16 +58,16 @@ export class AddressAPI {
 
         // If the address API is configured, we set the device ID if one is not already set
         if (payload) {
-            this.context.device().generatedID();
+            this.context.device.generatedID();
         }
 
-        const baseURL = this.context.apiEndpoint();
+        const baseURL = this.context.apiEndpoint;
         // For some reason, in testing this, the get only works if it is function
         // Does not work, for certain scenarios, if it is just a string
         const scope = nock(baseURL)
             .persist()
             .get((path) => {
-                return path === ("/v1/devices/" + this.context.device().id() + pathEnd);
+                return path === ("/v1/devices/" + this.context.device.id() + pathEnd);
             })
             .query(true)
             .reply(responseCode, JSON.stringify(payload, null, 2));

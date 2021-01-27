@@ -1,11 +1,11 @@
-import * as uuid from "uuid";
-import * as _ from "lodash";
-import { AudioPlayerActivity } from "../audioPlayer/AudioPlayer";
-import { SlotValue } from "../impl/SlotValue";
-import { SkillContext } from "./SkillContext";
-import { ConfirmationStatus, DialogState } from "../dialog/DialogManager";
-import { SkillResponse } from "./SkillResponse";
-import { VirtualAlexa } from "./VirtualAlexa";
+import { SkillContext } from './SkillContext';
+import { ConfirmationStatus, DialogState } from '../dialog/DialogManager';
+import { AudioPlayerActivity } from '../audioPlayer/AudioPlayer';
+import * as _ from 'lodash';
+import { SlotValue } from '../impl/SlotValue';
+import { SkillResponse } from './SkillResponse';
+import * as uuid from 'uuid';
+import { VirtualAlexa } from './VirtualAlexa';
 
 
 export class RequestType {
@@ -28,9 +28,9 @@ export enum SessionEndedReason {
 
 /**
  * Creates a the JSON for a Service Request programmatically
- * 
+ *
  * This class assists with setting all the values on the request.
- * 
+ *
  * Additionally, the raw JSON can be accessed with the .json() property.
  */
 export class SkillRequest {
@@ -40,17 +40,17 @@ export class SkillRequest {
      * The raw JSON of the request. This can be directly manipulated to modify what is sent to the skill.
      */
     public readonly json: any;
-    
+
     public constructor(private alexa: VirtualAlexa) {
-        this.context = alexa.context();
+        this.context = alexa.context;
         this.json = this.baseRequest();
     }
 
     /**
-     * Creates an AudioPlayer request type 
+     * Creates an AudioPlayer request type
      * @param requestType One the of the AudioPlayer RequestTypes
-     * @param token 
-     * @param offsetInMilliseconds 
+     * @param token
+     * @param offsetInMilliseconds
      */
     public audioPlayer(requestType: string, token: string, offsetInMilliseconds: number): SkillRequest {
         this.requestType(requestType);
@@ -59,7 +59,7 @@ export class SkillRequest {
         return this;
     }
 
-    /** 
+    /**
      * Creates a connection response object - used by Alexa Connections such as In-Skill Purchases
      * @param requestName
      * @param payload The payload object
@@ -67,7 +67,7 @@ export class SkillRequest {
      * @param statusCode The status code
      * @param statusMessage The status message
      */
-    public connectionsResponse(requestName: string, payload: any, token: string, statusCode = 200, statusMessage = "OK") {
+    public connectionsResponse(requestName: string, payload: any, token: string, statusCode = 200, statusMessage = "OK"): SkillRequest {
         this.requestType(RequestType.CONNECTIONS_RESPONSE);
         this.json.request.name = requestName
         this.json.request.payload = payload
@@ -85,7 +85,7 @@ export class SkillRequest {
      */
     public dialogState(state: DialogState): SkillRequest {
         this.context.dialogManager.state(state);
-        this.json.request.dialogState = state; 
+        this.json.request.dialogState = state;
         return this;
     }
 
@@ -99,23 +99,23 @@ export class SkillRequest {
         return this;
     }
 
-    public inSkillPurchaseResponse(requestName: string, 
-        purchaseResult: string, 
-        productId: string, 
-        token: string, 
-        statusCode = 200,
-        statusMessage = "OK") {
-        return this.connectionsResponse(requestName, 
+    public inSkillPurchaseResponse(requestName: string,
+                                   purchaseResult: string,
+                                   productId: string,
+                                   token: string,
+                                   statusCode = 200,
+                                   statusMessage = "OK"): SkillRequest {
+        return this.connectionsResponse(requestName,
             {
                 productId,
                 purchaseResult,
-            }, 
-            token, 
-            statusCode, 
+            },
+            token,
+            statusCode,
             statusMessage
         )
     }
-    
+
     /**
      * Sets the intent for the request
      * @param intentName
@@ -173,70 +173,54 @@ export class SkillRequest {
         return this;
     }
 
-    /** @internal */
-    public requiresSession(): boolean {
-        // LaunchRequests and IntentRequests both require a session
-        // We also force a session on a session ended request, as if someone requests a session end
-        //  we will make one first if there is not. It will then be ended.
-        return (this.json.request.type === RequestType.LAUNCH_REQUEST
-            || this.json.request.type === RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST
-            || this.json.request.type === RequestType.INTENT_REQUEST
-            || this.json.request.type === RequestType.SESSION_ENDED_REQUEST);
-    }
-
     public requestType(requestType: string): SkillRequest {
         this.json.request.type = requestType;
 
         // If we have a session, set the info
-        if (this.requiresSession()) {
+        const requiresSession = [RequestType.LAUNCH_REQUEST, RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST,
+            RequestType.INTENT_REQUEST, RequestType.SESSION_ENDED_REQUEST].includes(this.json.request.type);
+        if (requiresSession) {
             // Create a new session if there is not one
             if (!this.context.activeSession()) {
                 this.context.newSession();
             }
-            const applicationID = this.context.applicationID();
-
             const session = this.context.session();
-            const newSession = session.isNew();
-            const sessionID = session.id();
-            const attributes = session.attributes();
-
             this.json.session = {
                 application: {
-                    applicationId: applicationID,
+                    applicationId: this.context.applicationID(),
                 },
-                new: newSession,
-                sessionId: sessionID,
+                new: session.isNew(),
+                sessionId: session.id,
                 user: SkillRequest.userObject(this.context),
             };
 
             if (this.json.request.type !== RequestType.LAUNCH_REQUEST) {
-                this.json.session.attributes = attributes;
+                this.json.session.attributes = session.attributes;
             }
 
-            if (this.context.accessToken() !== null) {
-                this.json.session.user.accessToken = this.context.accessToken();
+            if (this.context.accessToken !== null) {
+                this.json.session.user.accessToken = this.context.accessToken;
             }
-        }
 
-        // For intent, launch and session ended requests, send the audio player state if there is one
-        if (this.requiresSession()) {
-            if (this.context.device().audioPlayerSupported()) {
-                const activity = AudioPlayerActivity[this.context.audioPlayer().playerActivity()];
+            // For intent, launch and session ended requests, send the audio player state if there is one
+            if (this.context.device.audioPlayerSupported()) {
+                const activity = AudioPlayerActivity[this.context.audioPlayer.playerActivity()];
                 this.json.context.AudioPlayer = {
                     playerActivity: activity,
                 };
 
                 // Anything other than IDLE, we send token and offset
-                if (this.context.audioPlayer().playerActivity() !== AudioPlayerActivity.IDLE) {
-                    const playing = this.context.audioPlayer().playing();
+                if (this.context.audioPlayer.playerActivity() !== AudioPlayerActivity.IDLE) {
+                    const playing = this.context.audioPlayer.playing();
                     this.json.context.AudioPlayer.token = playing.stream.token;
                     this.json.context.AudioPlayer.offsetInMilliseconds = playing.stream.offsetInMilliseconds;
                 }
             }
         }
+
         return this;
     }
-    
+
     /**
      * Creates a SessionEndedRequest request
      * @param reason The reason the session ended
@@ -264,9 +248,9 @@ export class SkillRequest {
 
     /**
      * Sets a slot value on the request
-     * @param slotName 
-     * @param slotValue 
-     * @param confirmationStatus 
+     * @param slotName
+     * @param slotValue
+     * @param confirmationStatus
      */
     public slot(slotName: string, slotValue: string, confirmationStatus: ConfirmationStatus = ConfirmationStatus.NONE): SkillRequest {
         const intent = this.context.interactionModel.intentSchema.intent(this.json.request.intent.name);
@@ -277,13 +261,13 @@ export class SkillRequest {
         }
 
         if (!intent.slotForName(slotName)) {
-            throw new Error("Trying to add undefined slot to intent: " + slotName);   
+            throw new Error("Trying to add undefined slot to intent: " + slotName);
         }
-            
+
         const slotValueObject = new SlotValue(slotName, slotValue, confirmationStatus);
         slotValueObject.setEntityResolution(this.context, this.json.request.intent.name);
         this.json.request.intent.slots[slotName] = slotValueObject;
-        
+
         if (this.context.interactionModel.dialogIntent(this.json.request.intent.name)) {
             // Update the internal state of the dialog manager based on this request
             this.context.dialogManager.updateSlot(slotName, slotValueObject);
@@ -314,8 +298,8 @@ export class SkillRequest {
 
     /**
      * For dialogs, updates the confirmation status of a slot - does not change the value
-     * @param slotName 
-     * @param confirmationStatus 
+     * @param slotName
+     * @param confirmationStatus
      */
     public slotStatus(slotName: string, confirmationStatus: ConfirmationStatus): SkillRequest {
         this.context.dialogManager.slots()[slotName].confirmationStatus = confirmationStatus;
@@ -323,8 +307,8 @@ export class SkillRequest {
     }
 
     private baseRequest(): any {
-        const applicationID = this.context.applicationID();
-        const requestID = "amzn1.echo-external.request." + uuid.v4();
+        const applicationId = this.context.applicationID();
+        const requestId = "amzn1.echo-external.request." + uuid.v4();
         const timestamp = new Date().toISOString().substring(0, 19) + "Z";
 
         // First create the header part of the request
@@ -332,35 +316,35 @@ export class SkillRequest {
             context: {
                 System: {
                     application: {
-                        applicationId: applicationID,
+                        applicationId,
                     },
                     device: {
-                        supportedInterfaces: this.context.device().supportedInterfaces(),
+                        supportedInterfaces: this.context.device.supportedInterfaces(),
                     },
                     user: SkillRequest.userObject(this.context),
                 },
             },
             request: {
                 locale: this.context.locale(),
-                requestId: requestID,
+                requestId,
                 timestamp,
             },
             version: "1.0",
         };
 
         // If the device ID is set, we set the API endpoint and deviceId properties
-        if (this.context.device().id()) {
-            baseRequest.context.System.apiAccessToken = this.context.apiAccessToken();
-            baseRequest.context.System.apiEndpoint = this.context.apiEndpoint();
-            baseRequest.context.System.device.deviceId = this.context.device().id();
+        if (this.context.device.id()) {
+            baseRequest.context.System.apiAccessToken = this.context.apiAccessToken;
+            baseRequest.context.System.apiEndpoint = this.context.apiEndpoint;
+            baseRequest.context.System.device.deviceId = this.context.device.id();
         }
 
-        if (this.context.accessToken() !== null) {
-            baseRequest.context.System.user.accessToken = this.context.accessToken();
+        if (this.context.accessToken !== null) {
+            baseRequest.context.System.user.accessToken = this.context.accessToken;
         }
 
         // If display enabled, we add a display object to context
-        if (this.context.device().displaySupported()) {
+        if (this.context.device.displaySupported()) {
             baseRequest.context.Display = {};
         }
         return baseRequest;
@@ -368,11 +352,11 @@ export class SkillRequest {
 
     private static userObject(context: SkillContext): any {
         const o: any = {
-            userId: context.user().id(),
+            userId: context.user.id(),
         };
 
         // If we have a device ID, means we have permissions enabled and a consent token
-        if (context.device().id()) {
+        if (context.device.id()) {
             o.permissions = {
                 consentToken: uuid.v4(),
             };
