@@ -1,10 +1,9 @@
 import * as uuid from "uuid";
 import * as _ from "lodash";
-import {AudioPlayerActivity} from "../audioPlayer/AudioPlayer";
-import {SlotValue} from "../impl/SlotValue";
-import {SkillContext} from "./SkillContext";
+import { AudioPlayerActivity } from "../audioPlayer/AudioPlayer";
+import { SlotValue } from "../impl/SlotValue";
+import { SkillContext } from "./SkillContext";
 import { ConfirmationStatus, DialogState } from "../dialog/DialogManager";
-import { request } from "https";
 import { SkillResponse } from "./SkillResponse";
 import { VirtualAlexa } from "./VirtualAlexa";
 
@@ -49,8 +48,8 @@ export class SkillRequest {
         return "amzn1.echo-external.request." + uuid.v4();
     }
 
-    private context: SkillContext;
-    private _json: any;
+    private readonly context: SkillContext;
+    private readonly _json: any;
     
     public constructor(private alexa: VirtualAlexa) {
         this.context = alexa.context();
@@ -130,13 +129,13 @@ export class SkillRequest {
     /**
      * Sets the intent for the request
      * @param intentName
+     * @param confirmationStatus
      * @returns {SkillRequest}
      */
     public intent(intentName: string, confirmationStatus: ConfirmationStatus = ConfirmationStatus.NONE): SkillRequest {
         this.requestType(RequestType.INTENT_REQUEST);
-        const isBuiltin = intentName.startsWith("AMAZON");
-        if (!isBuiltin) {
-            if (!this.context.interactionModel().hasIntent(intentName)) {
+        if (!intentName.startsWith("AMAZON")) { // isBuiltin
+            if (!this.context.interactionModel.hasIntent(intentName)) {
                 throw new Error("Interaction model has no intentName named: " + intentName);
             }
         }
@@ -148,25 +147,20 @@ export class SkillRequest {
         };
 
         // Set default slot values - all slots must have a value for an intent
-        const intent = this.context.interactionModel().intentSchema.intent(intentName);
-        const intentSlots = intent.slots;
-        
-        if (intentSlots) {
-            for (const intentSlot of intentSlots) {
-                this._json.request.intent.slots[intentSlot.name] = {
-                    name: intentSlot.name,
-                    confirmationStatus: ConfirmationStatus.NONE
-                }
-            }
-        }
+        const intent = this.context.interactionModel.intentSchema.intent(intentName);
+        intent.slots?.forEach(intentSlot =>
+            this._json.request.intent.slots[intentSlot.name] = {
+                name: intentSlot.name,
+                confirmationStatus: ConfirmationStatus.NONE
+            });
 
-        if (this.context.interactionModel().dialogIntent(intentName)) {
+        if (this.context.interactionModel.dialogIntent(intentName)) {
             //Update the internal state of the dialog manager based on this request
             this.context.dialogManager().handleRequest(this);
 
             // Our slots can just be taken from the dialog manager now
             //  It has the complete current state of the slot values for the dialog intent
-            this.json().request.intent.slots = this.context.dialogManager().slots();
+            this._json.request.intent.slots = this.context.dialogManager().slots();
         }
 
         return this;
@@ -293,7 +287,7 @@ export class SkillRequest {
      * @param confirmationStatus 
      */
     public slot(slotName: string, slotValue: string, confirmationStatus: ConfirmationStatus = ConfirmationStatus.NONE): SkillRequest {
-        const intent = this.context.interactionModel().intentSchema.intent(this.json().request.intent.name);
+        const intent = this.context.interactionModel.intentSchema.intent(this.json().request.intent.name);
 
         const intentSlots = intent.slots;
         if (!intentSlots) {
@@ -308,7 +302,7 @@ export class SkillRequest {
         slotValueObject.setEntityResolution(this.context, this._json.request.intent.name);
         this._json.request.intent.slots[slotName] = slotValueObject;
         
-        if (this.context.interactionModel().dialogIntent(this._json.request.intent.name)) {
+        if (this.context.interactionModel.dialogIntent(this._json.request.intent.name)) {
             //Update the internal state of the dialog manager based on this request
             this.context.dialogManager().updateSlot(slotName, slotValueObject);
         }

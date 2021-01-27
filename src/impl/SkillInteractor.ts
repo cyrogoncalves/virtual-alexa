@@ -1,11 +1,6 @@
-import {AudioPlayer} from "../audioPlayer/AudioPlayer";
-import {SkillContext} from "../core/SkillContext";
-import {SessionEndedReason, SkillRequest} from "../core/SkillRequest";
-import {SkillResponse} from "../core/SkillResponse";
-import {RequestFilter} from "../core/VirtualAlexa";
-import {InteractionModel} from "../model/InteractionModel";
-import { VirtualAlexa } from "../core/VirtualAlexa";
-import { request } from "https";
+import { SkillRequest } from "../core/SkillRequest";
+import { SkillResponse } from "../core/SkillResponse";
+import { RequestFilter, VirtualAlexa } from "../core/VirtualAlexa";
 
 /**
  * SkillInteractor comes in two flavors:
@@ -70,8 +65,4 @@ export abstract class SkillInteractor {
 
     protected abstract invoke(requestJSON: any): Promise<any>;
 
-    // Helper method for getting interaction model
-    private interactionModel(): InteractionModel {
-        return this._alexa.context().interactionModel();
-    }
 }

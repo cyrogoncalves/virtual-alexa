@@ -15,16 +15,16 @@ import {User} from "./User";
  */
 export class SkillContext {
     /** @internal */
-    private _audioPlayer: AudioPlayer;
+    private readonly _audioPlayer: AudioPlayer;
     private _accessToken: string = null;
-    private _apiAccessToken: string;
-    private _apiEndpoint: string;
-    private _device: Device;
+    private readonly _apiAccessToken: string;
+    private readonly _apiEndpoint: string;
+    private readonly _device: Device;
     /** @internal */
-    private _dialogManager: DialogManager;
+    private readonly _dialogManager: DialogManager;
     /** @internal */
-    private _interactionModel: InteractionModel;
-    private _user: User;
+    private readonly _interactionModel: InteractionModel;
+    private readonly _user: User;
     private _session: SkillSession;
 
     /** @internal */
@@ -51,10 +51,8 @@ export class SkillContext {
     }
 
     public applicationID(): string {
-        // Generate an application ID if it is not set
-        if (this._applicationID === undefined || this._applicationID === null) {
+        if (!this._applicationID) // Generate an application ID if it is not set
             this._applicationID = "amzn1.echo-sdk-ams.app." + uuid.v4();
-        }
         return this._applicationID;
     }
 
@@ -63,7 +61,7 @@ export class SkillContext {
     }
 
     /** @internal */
-    public interactionModel(): InteractionModel {
+    get interactionModel(): InteractionModel {
         return this._interactionModel;
     }
 
@@ -80,7 +78,7 @@ export class SkillContext {
     }
 
     public locale(): string {
-        return this._locale ? this._locale : "en-US";
+        return this._locale || "en-US";
     }
 
     /** @internal */

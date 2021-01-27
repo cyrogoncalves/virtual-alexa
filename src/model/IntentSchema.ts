@@ -12,22 +12,14 @@ export class IntentSchema implements IIntentSchema {
         return new IntentSchema(schemaJSON);
     }
 
-    public constructor(public schemaJSON: any) {
-
-    }
+    public constructor(public schemaJSON: any) {}
 
     public intents(): Intent[] {
-        const intentArray: Intent[] = [];
-        for (const intentJSON of this.schemaJSON.intents) {
+        return this.schemaJSON.intents.map((intentJSON: any) => {
             const intent = new Intent(intentJSON.intent);
-            if (intentJSON.slots !== undefined && intentJSON.slots !== null) {
-                for (const slotJSON of intentJSON.slots) {
-                    intent.addSlot(new IntentSlot(slotJSON.name, slotJSON.type));
-                }
-            }
-            intentArray.push(intent);
-        }
-        return intentArray;
+            intentJSON.slots?.forEach((slotJSON: any) => intent.addSlot(new IntentSlot(slotJSON.name, slotJSON.type)));
+            return intent;
+        });
     }
 
     public intent(intentString: string): Intent {

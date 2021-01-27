@@ -1,11 +1,11 @@
 import * as fs from "fs";
-import {IModel, SampleUtterances, SlotTypes} from "virtual-core";
-import {DialogIntent} from "../dialog/DialogIntent";
-import {BuiltinSlotTypes} from "./BuiltinSlotTypes";
-import {AudioPlayerIntents, BuiltinUtterances} from "./BuiltinUtterances";
-import {IntentSchema} from "./IntentSchema";
-import {SampleUtterancesBuilder} from "./SampleUtterancesBuilder";
-import {SlotPrompt} from "./SlotPrompt";
+import { IModel, SampleUtterances, SlotTypes } from "virtual-core";
+import { DialogIntent } from "../dialog/DialogIntent";
+import { BuiltinSlotTypes } from "./BuiltinSlotTypes";
+import { AudioPlayerIntents, BuiltinUtterances } from "./BuiltinUtterances";
+import { IntentSchema } from "./IntentSchema";
+import { SampleUtterancesBuilder } from "./SampleUtterancesBuilder";
+import { SlotPrompt } from "./SlotPrompt";
 
 /**
  * Parses and interprets an interaction model
@@ -34,11 +34,6 @@ export class InteractionModel implements IModel {
     // Using this for reference:
     //  https://github.com/alexa/skill-sample-nodejs-team-lookup/blob/master/speech-assets/interaction-model.json
     public static fromJSON(interactionModel: any): InteractionModel {
-        const schemaJSON: any = {
-            intents: [],
-        };
-        const sampleJSON: any = {};
-
         let languageModel = interactionModel;
         let promptsElement = interactionModel.prompts;
         let dialogElement = interactionModel.dialog;
@@ -55,8 +50,11 @@ export class InteractionModel implements IModel {
             languageModel = interactionModel.languageModel;
         }
 
-        const intents = languageModel.intents;
-        for (const intent of intents) {
+        const schemaJSON: any = {
+            intents: [],
+        };
+        const sampleJSON: any = {};
+        for (const intent of languageModel.intents) {
             // The name of the intent is on the property "name" instead of "intent" for the unified model
             intent.intent = intent.name;
             schemaJSON.intents.push(intent);
@@ -72,21 +70,10 @@ export class InteractionModel implements IModel {
         const schema = new IntentSchema(schemaJSON);
         const samples = SampleUtterancesBuilder.fromJSON(sampleJSON);
 
-        let prompts;
-        if (promptsElement) {
-            prompts = [];
-            for (const prompt of promptsElement) {
-                prompts.push(SlotPrompt.fromJSON(prompt));
-            }
-        }
+        const prompts = promptsElement?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
 
-        let dialogIntents;
-        if (dialogElement) {
-            dialogIntents = [];
-            for (const dialogIntent of dialogElement.intents) {
-                dialogIntents.push(DialogIntent.fromJSON(interactionModel, dialogIntent));
-            }
-        }
+        const dialogIntents = dialogElement?.intents.map((dialogIntent: any) =>
+            DialogIntent.fromJSON(interactionModel, dialogIntent)) ?? [];
 
         return new InteractionModel(schema, samples, slotTypes, prompts, dialogIntents);
     }
@@ -108,18 +95,14 @@ export class InteractionModel implements IModel {
         if (!this.slotTypes) {
             this.slotTypes = new SlotTypes([]);
         }
+        this.slotTypes.addTypes(BuiltinSlotTypes.values());
 
         // In bootstrapping the interaction model, we pass it to its children
         this.sampleUtterances.setInteractionModel(this);
 
-        if (this.dialogIntents) {
-            for (const dialogIntent of this.dialogIntents) {
-                dialogIntent.interactionModel = this;
-            }
-        }
+        this.dialogIntents?.forEach(dialogIntent => dialogIntent.interactionModel = this);
 
         const builtinValues = BuiltinUtterances.values();
-
         const isAudioPlayerSupported = this.audioPlayerSupported(intentSchema);
         // We add each phrase one-by-one
         // It is possible the built-ins have additional samples defined
@@ -132,8 +115,6 @@ export class InteractionModel implements IModel {
                 }
             }
         }
-
-        this.slotTypes.addTypes(BuiltinSlotTypes.values());
     }
     
     public isSupportedIntent(isAudioPlayerSupported: boolean, intent: string): boolean {
@@ -147,32 +128,11 @@ export class InteractionModel implements IModel {
     }
 
     public dialogIntent(intentName: string): DialogIntent | undefined {
-        if (!this.dialogIntents) {
-            return undefined;
-        }
-
-        for (const dialogIntent of this.dialogIntents) {
-            // If our intent matches a dialog intent, then we flip into dialog mode
-            if (dialogIntent.name === intentName) {
-                return dialogIntent;
-            }
-        }
-
-        return undefined;
+        return this.dialogIntents?.find(dialogIntent => dialogIntent.name === intentName) || undefined;
     }
 
     public prompt(id: string): SlotPrompt | undefined {
-        if (!this.prompts) {
-            return undefined;
-        }
-
-        for (const prompt of this.prompts) {
-            if (prompt.id === id) {
-                return prompt;
-            }
-        }
-
-        return undefined;
+        return this.prompts?.find(prompt => prompt.id === id) || undefined;
     }
 
     public audioPlayerSupported(intentSchema: IntentSchema) : boolean {

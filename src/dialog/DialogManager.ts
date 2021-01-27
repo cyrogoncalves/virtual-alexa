@@ -31,8 +31,8 @@ export class DialogManager {
         for (const directive of response.response.directives) {
             if (directive.type.startsWith("Dialog")) {
                 if (directive.updatedIntent) {
-                    this._dialogIntent = this.context.interactionModel().dialogIntent(directive.updatedIntent.name);
-                    if (!this.context.interactionModel().dialogIntent(directive.updatedIntent.name)) {
+                    this._dialogIntent = this.context.interactionModel.dialogIntent(directive.updatedIntent.name);
+                    if (!this.context.interactionModel.dialogIntent(directive.updatedIntent.name)) {
                         throw new Error("No match for dialog name: " + directive.updatedIntent.name);
                     }
                 }
@@ -80,9 +80,9 @@ export class DialogManager {
     /** @internal */
     public handleRequest(request: SkillRequest): void {
         const intentName = request.json().request.intent.name;
-        if (this.context.interactionModel().dialogIntent(intentName)) {
+        if (this.context.interactionModel.dialogIntent(intentName)) {
             // Set the dialog intent here - it may not be set by the skill in its response
-            this._dialogIntent = this.context.interactionModel().dialogIntent(intentName);
+            this._dialogIntent = this.context.interactionModel.dialogIntent(intentName);
 
             // Make sure the dialog state is set to started
             if (!this._dialogState) {

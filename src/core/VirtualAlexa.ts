@@ -1,19 +1,18 @@
-import {AudioPlayer} from "../audioPlayer/AudioPlayer";
-import {AddressAPI} from "../external/AddressAPI";
-import {DialogManager} from "../dialog/DialogManager";
-import {DynamoDB} from "../external/DynamoDB";
-import {LocalSkillInteractor} from "../impl/LocalSkillInteractor";
-import {RemoteSkillInteractor} from "../impl/RemoteSkillInteractor";
-import {SkillInteractor} from "../impl/SkillInteractor";
-import {IntentSchema} from "../model/IntentSchema";
-import {InteractionModel} from "../model/InteractionModel";
-import {SampleUtterancesBuilder} from "../model/SampleUtterancesBuilder";
-import {SkillContext} from "./SkillContext";
-import {SessionEndedReason} from "./SkillRequest";
-import {SkillRequest} from "./SkillRequest";
-import {SkillResponse} from "./SkillResponse";
-import {UserAPI} from "../external/UserAPI";
-import {Utterance} from "virtual-core";
+import { AudioPlayer } from "../audioPlayer/AudioPlayer";
+import { AddressAPI } from "../external/AddressAPI";
+import { DialogManager } from "../dialog/DialogManager";
+import { DynamoDB } from "../external/DynamoDB";
+import { LocalSkillInteractor } from "../impl/LocalSkillInteractor";
+import { RemoteSkillInteractor } from "../impl/RemoteSkillInteractor";
+import { SkillInteractor } from "../impl/SkillInteractor";
+import { IntentSchema } from "../model/IntentSchema";
+import { InteractionModel } from "../model/InteractionModel";
+import { SampleUtterancesBuilder } from "../model/SampleUtterancesBuilder";
+import { SkillContext } from "./SkillContext";
+import { SessionEndedReason, SkillRequest } from "./SkillRequest";
+import { SkillResponse } from "./SkillResponse";
+import { UserAPI } from "../external/UserAPI";
+import { Utterance } from "virtual-core";
 
 
 export class VirtualAlexa {
@@ -22,15 +21,15 @@ export class VirtualAlexa {
     }
 
     /** @internal */
-    private _interactor: SkillInteractor;
+    private readonly _interactor: SkillInteractor;
     /** @internal */
-    private _addressAPI: AddressAPI;
+    private readonly _addressAPI: AddressAPI;
     /** @internal */
-    private _userAPI: UserAPI;
+    private readonly _userAPI: UserAPI;
     /** @internal */
-    private _context: SkillContext = null;
+    private readonly _context: SkillContext = null;
     /** @internal */
-    private _dynamoDB: DynamoDB;
+    private readonly _dynamoDB: DynamoDB;
     
     /** @internal */
     public constructor(interactor: SkillInteractor, model: InteractionModel, locale: string, applicationID?: string) {
@@ -39,8 +38,8 @@ export class VirtualAlexa {
         this._context.newSession();
         
         this._interactor = interactor;
-        this._addressAPI = new AddressAPI(this.context());
-        this._userAPI = new UserAPI(this.context());
+        this._addressAPI = new AddressAPI(this._context);
+        this._userAPI = new UserAPI(this._context);
         this._dynamoDB = new DynamoDB();
     }
 
@@ -54,7 +53,7 @@ export class VirtualAlexa {
 
     // Provides access to the AudioPlayer object, for sending audio requests
     public audioPlayer(): AudioPlayer {
-        return this.context().audioPlayer();
+        return this._context.audioPlayer();
     }
 
     // Invoke virtual alexa with constructed skill request
@@ -68,7 +67,7 @@ export class VirtualAlexa {
     }
 
     public dialogManager(): DialogManager {
-        return this.context().dialogManager();
+        return this._context.dialogManager();
     }
 
     public dynamoDB() {
@@ -162,7 +161,7 @@ export class VirtualAlexa {
             resolvedUtterance = launchRequestOrUtter;
         }
 
-        const utterance = new Utterance(this.context().interactionModel(), resolvedUtterance);
+        const utterance = new Utterance(this._context.interactionModel, resolvedUtterance);
         // If we don't match anything, we use the default utterance - simple algorithm for this
         if (!utterance.matched()) {
             throw new Error("Unable to match utterance: " + resolvedUtterance
@@ -181,11 +180,7 @@ export class VirtualAlexa {
         if (launchRequestRegex.test(utter)) {
             const launchAndUtterRegex = /^(?:ask|open|launch|talk to|tell) .* to (.*)/i;
             const result = launchAndUtterRegex.exec(utter);
-            if (result && result.length) {
-                return result[1];
-            } else {
-                return true;
-            }
+            return result?.length ? result[1] : true;
         }
 
         return undefined;
@@ -226,7 +221,7 @@ export class VirtualAlexaBuilder {
     /** @internal */
     private _skillURL: string;
     /** @internal */
-    private _locale: string;
+    private _locale: string = "en-US";
 
     /**
      * The application ID of the skill [Optional]
@@ -345,8 +340,6 @@ export class VirtualAlexaBuilder {
 
     public create(): VirtualAlexa {
         let model;
-        const locale = this._locale ? this._locale : "en-US";
-
         if (this._interactionModel) {
             model = InteractionModel.fromJSON(this._interactionModel);
 
@@ -363,7 +356,7 @@ export class VirtualAlexaBuilder {
             const utterances = SampleUtterancesBuilder.fromFile(this._sampleUtterancesFile);
             model = new InteractionModel(schema, utterances);
         } else {
-            model = InteractionModel.fromLocale(locale);
+            model = InteractionModel.fromLocale(this._locale);
             if (!model) {
                 throw new Error(
                     "Either an interaction model or intent schema and sample utterances must be provided.\n" +
@@ -373,7 +366,6 @@ export class VirtualAlexaBuilder {
         }
 
         let interactor;
-
         if (this._handler) {
             interactor = new LocalSkillInteractor(this._handler);
         } else if (this._skillURL) {
@@ -382,7 +374,7 @@ export class VirtualAlexaBuilder {
             throw new Error("Either a handler or skillURL must be provided.");
         }
 
-        const alexa = new VirtualAlexa(interactor, model, locale, this._applicationID);
+        const alexa = new VirtualAlexa(interactor, model, this._locale, this._applicationID);
         (interactor as any)._alexa = alexa;
         return alexa;
     }

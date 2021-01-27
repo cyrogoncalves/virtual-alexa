@@ -18,12 +18,12 @@ export class SlotValue {
     }
 
     public setEntityResolution(context: SkillContext, intentName: string) {
-        const intent = context.interactionModel().intentSchema.intent(intentName);
+        const intent = context.interactionModel.intentSchema.intent(intentName);
         if (!intent.slots) {
             return;
         }
         const slot = intent.slotForName(this.name);
-        const slotType = context.interactionModel().slotTypes.slotType(slot.type);
+        const slotType = context.interactionModel.slotTypes.slotType(slot.type);
         // We only include the entity resolution for builtin types if they have been extended
         //  and for all custom slot types
         if (slotType && slotType.isCustom()) {
