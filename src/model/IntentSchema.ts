@@ -1,7 +1,7 @@
 import * as fs from "fs";
-import {IIntentSchema, Intent, IntentSlot} from "virtual-core";
+import { Intent, IntentSlot } from '../virtualCore/IIntentSchema';
 
-export class IntentSchema implements IIntentSchema {
+export class IntentSchema {
     public static fromFile(file: string): IntentSchema {
         const data = fs.readFileSync(file);
         const json = JSON.parse(data.toString());
@@ -23,25 +23,15 @@ export class IntentSchema implements IIntentSchema {
     }
 
     public intent(intentString: string): Intent {
-        let intent: Intent = null;
-        for (const o of this.intents()) {
-            if (o.name === intentString) {
-                intent = o;
-                break;
-            }
-        }
-        return intent;
+        return this.intents().find(o => o.name === intentString);
     }
 
     public hasIntent(intentString: string): boolean {
-        return this.intent(intentString) !== null;
+        return !!this.intent(intentString);
     }
 
     public addIntent(intent: string): void {
-        const matchIntentByName = function (item: any) {
-            return item.intent === intent;
-        };
-        if (!this.schemaJSON.intents.some(matchIntentByName)){
+        if (!this.schemaJSON.intents.some((item: any) => item.intent === intent)) {
             this.schemaJSON.intents.push({intent});
         }
     }

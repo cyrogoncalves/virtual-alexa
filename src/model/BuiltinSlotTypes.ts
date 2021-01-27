@@ -1,4 +1,4 @@
-import {ISlotValue, SlotMatch, SlotType} from "virtual-core";
+import { ISlotValue, SlotMatch, SlotType } from '../virtualCore/SlotTypes';
 
 export class BuiltinSlotTypes {
     public static values(): BuiltinSlotType [] {

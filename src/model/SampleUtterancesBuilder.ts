@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import {SampleUtterances} from "virtual-core";
+import { SampleUtterances } from '../virtualCore/SampleUtterances';
 
 export class SampleUtterancesBuilder {
     public static fromFile(file: string): SampleUtterances {

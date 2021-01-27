@@ -56,8 +56,7 @@
     "aws-sdk": "^2.831.0",
     "lodash": "^4.17.20",
     "nock": "^13.0.6",
-    "uuid": "^8.3.2",
-    "virtual-core": "0.1.1"
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@types/aws-sdk": "^2.7.0",

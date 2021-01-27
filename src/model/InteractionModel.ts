@@ -1,5 +1,6 @@
 import * as fs from "fs";
-import { IModel, SampleUtterances, SlotTypes } from "virtual-core";
+import { SlotTypes } from '../virtualCore/SlotTypes';
+import { SampleUtterances } from '../virtualCore/SampleUtterances';
 import { DialogIntent } from "../dialog/DialogIntent";
 import { BuiltinSlotTypes } from "./BuiltinSlotTypes";
 import { AudioPlayerIntents, BuiltinUtterances } from "./BuiltinUtterances";
@@ -12,7 +13,7 @@ import { SlotPrompt } from "./SlotPrompt";
  * Takes in intentName schema and sample utterances from files
  * Then can take a phrase and create an intentName request based on it
  */
-export class InteractionModel implements IModel {
+export class InteractionModel {
 
     // Parse the all-in-one interaction model as a file
     public static fromFile(interactionModelFile: any): InteractionModel {
@@ -118,13 +119,9 @@ export class InteractionModel implements IModel {
     }
     
     public isSupportedIntent(isAudioPlayerSupported: boolean, intent: string): boolean {
-        const hasIntent = this.hasIntent(intent);
+        const hasIntent = this.intentSchema.hasIntent(intent);
         const isAudioPlayerIntent = isAudioPlayerSupported && AudioPlayerIntents.indexOf(intent) >= 0;
         return hasIntent || isAudioPlayerIntent;
-    }
-
-    public hasIntent(intent: string): boolean {
-        return this.intentSchema.hasIntent(intent);
     }
 
     public dialogIntent(intentName: string): DialogIntent | undefined {

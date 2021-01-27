@@ -1,5 +1,5 @@
-import {SampleUtterances, SlotTypes, Utterance} from "virtual-core";
-
+import { Utterance } from '../src/virtualCore/Utterance';
+import { SlotTypes } from '../src/virtualCore/SlotTypes';
 import {assert} from "chai";
 import {IntentSchema} from "../src/model/IntentSchema";
 import {InteractionModel} from "../src/model/InteractionModel";

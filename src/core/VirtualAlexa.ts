@@ -12,7 +12,7 @@ import { SkillContext } from "./SkillContext";
 import { SessionEndedReason, SkillRequest } from "./SkillRequest";
 import { SkillResponse } from "./SkillResponse";
 import { UserAPI } from "../external/UserAPI";
-import { Utterance } from "virtual-core";
+import { Utterance } from '../virtualCore/Utterance';
 
 
 export class VirtualAlexa {

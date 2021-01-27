@@ -134,8 +134,8 @@ export class SkillRequest {
      */
     public intent(intentName: string, confirmationStatus: ConfirmationStatus = ConfirmationStatus.NONE): SkillRequest {
         this.requestType(RequestType.INTENT_REQUEST);
-        if (!intentName.startsWith("AMAZON")) { // isBuiltin
-            if (!this.context.interactionModel.hasIntent(intentName)) {
+        if (!intentName.startsWith("AMAZON")) { // no built-in
+            if (!this.context.interactionModel.intentSchema.hasIntent(intentName)) {
                 throw new Error("Interaction model has no intentName named: " + intentName);
             }
         }
@@ -148,14 +148,14 @@ export class SkillRequest {
 
         // Set default slot values - all slots must have a value for an intent
         const intent = this.context.interactionModel.intentSchema.intent(intentName);
-        intent.slots?.forEach(intentSlot =>
+        intent.slots?.forEach((intentSlot: any) =>
             this._json.request.intent.slots[intentSlot.name] = {
                 name: intentSlot.name,
                 confirmationStatus: ConfirmationStatus.NONE
             });
 
         if (this.context.interactionModel.dialogIntent(intentName)) {
-            //Update the internal state of the dialog manager based on this request
+            // Update the internal state of the dialog manager based on this request
             this.context.dialogManager().handleRequest(this);
 
             // Our slots can just be taken from the dialog manager now
