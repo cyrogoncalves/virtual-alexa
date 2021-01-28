@@ -5,7 +5,8 @@ import * as _ from 'lodash';
 import { SlotValue } from '../impl/SlotValue';
 import { SkillResponse } from './SkillResponse';
 import * as uuid from 'uuid';
-import { VirtualAlexa } from './VirtualAlexa';
+import { RequestFilter } from './VirtualAlexa';
+import { SkillInteractor } from '../impl/SkillInteractor';
 
 
 export class RequestType {
@@ -34,16 +35,54 @@ export enum SessionEndedReason {
  * Additionally, the raw JSON can be accessed with the .json() property.
  */
 export class SkillRequest {
-    private readonly context: SkillContext;
-
     /**
      * The raw JSON of the request. This can be directly manipulated to modify what is sent to the skill.
      */
     public readonly json: any;
 
-    public constructor(private alexa: VirtualAlexa) {
-        this.context = alexa.context;
-        this.json = this.baseRequest();
+    public constructor(
+        private readonly context: SkillContext,
+        private readonly _interactor: SkillInteractor,
+        private requestFilter: RequestFilter
+    ) {
+        // First create the header part of the request
+        const baseRequest: any = {
+            context: {
+                System: {
+                    application: {
+                        applicationId: context.applicationID(),
+                    },
+                    device: {
+                        supportedInterfaces: context.device.supportedInterfaces,
+                    },
+                    user: {
+                        userId: context.userId,
+                        ...(context.device.id && { permissions: { consentToken: uuid.v4() } }),
+                        ...(context.accessToken && { accessToken: context.accessToken })
+                    },
+                },
+            },
+            request: {
+                locale: context.locale(),
+                requestId: "amzn1.echo-external.request." + uuid.v4(),
+                timestamp: new Date().toISOString().substring(0, 19) + "Z",
+            },
+            version: "1.0",
+        };
+
+        // If the device ID is set, we set the API endpoint and deviceId properties
+        if (context.device.id) {
+            baseRequest.context.System.apiAccessToken = context.apiAccessToken;
+            baseRequest.context.System.apiEndpoint = context.apiEndpoint;
+            baseRequest.context.System.device.deviceId = context.device.id;
+        }
+
+        // If display enabled, we add a display object to context
+        if (context.device.displaySupported()) {
+            baseRequest.context.Display = {};
+        }
+
+        this.json = baseRequest;
     }
 
     /**
@@ -177,30 +216,26 @@ export class SkillRequest {
         this.json.request.type = requestType;
 
         // If we have a session, set the info
-        const requiresSession = [RequestType.LAUNCH_REQUEST, RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST,
-            RequestType.INTENT_REQUEST, RequestType.SESSION_ENDED_REQUEST].includes(this.json.request.type);
-        if (requiresSession) {
-            // Create a new session if there is not one
-            if (!this.context.activeSession()) {
+        if ([RequestType.LAUNCH_REQUEST, RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST,
+            RequestType.INTENT_REQUEST, RequestType.SESSION_ENDED_REQUEST].includes(this.json.request.type)) {
+            if (!this.context.session) {
                 this.context.newSession();
             }
-            const session = this.context.session();
             this.json.session = {
                 application: {
                     applicationId: this.context.applicationID(),
                 },
-                new: session.isNew(),
-                sessionId: session.id,
-                user: SkillRequest.userObject(this.context),
+                new: this.context.session.new,
+                sessionId: this.context.session.id,
+                user: {
+                    userId: this.context.userId,
+                    ...(this.context.device.id && { permissions: {
+                        consentToken: uuid.v4()
+                    }}),
+                    ...(this.context.accessToken && { accessToken: this.context.accessToken })
+                },
+                ...(this.json.request.type !== RequestType.LAUNCH_REQUEST && { attributes: this.context.session.attributes })
             };
-
-            if (this.json.request.type !== RequestType.LAUNCH_REQUEST) {
-                this.json.session.attributes = session.attributes;
-            }
-
-            if (this.context.accessToken !== null) {
-                this.json.session.user.accessToken = this.context.accessToken;
-            }
 
             // For intent, launch and session ended requests, send the audio player state if there is one
             if (this.context.device.audioPlayerSupported()) {
@@ -252,7 +287,7 @@ export class SkillRequest {
      * @param slotValue
      * @param confirmationStatus
      */
-    public slot(slotName: string, slotValue: string, confirmationStatus: ConfirmationStatus = ConfirmationStatus.NONE): SkillRequest {
+    public slot(slotName: string, slotValue: string, confirmationStatus = ConfirmationStatus.NONE): SkillRequest {
         const intent = this.context.interactionModel.intentSchema.intent(this.json.request.intent.name);
 
         const intentSlots = intent.slots;
@@ -279,8 +314,46 @@ export class SkillRequest {
     /**
      * Sends the request to the Alexa skill
      */
-    public send(): Promise<SkillResponse> {
-        return this.alexa.call(this);
+    public async send(): Promise<SkillResponse> {
+        // When the user utters an intent, we suspend for it
+        // We do this first to make sure everything is in the right state for what comes next
+        if (this.json.request.intent
+            && this.context.device.audioPlayerSupported()
+            && this.context.audioPlayer.isPlaying()) {
+            await this.context.audioPlayer.suspend();
+        }
+
+        this.requestFilter?.(this.json);
+
+        const result: any = await this._interactor.invoke(this.json);
+
+        // If this was a session ended request, end the session in our internal state
+        if (this.json.request.type === "SessionEndedRequest") {
+            this.context.endSession();
+        }
+        if (this.context.session) {
+            this.context.session.new = false;
+            if (result?.response?.shouldEndSession) {
+                this.context.endSession();
+            } else if (result.sessionAttributes) {
+                this.context.session.attributes = result.sessionAttributes;
+            }
+        }
+
+        if (result.response?.directives) {
+            await this.context.audioPlayer.directivesReceived(result.response.directives);
+            // Update the dialog manager based on the results
+            this.context.dialogManager.handleDirective(result);
+        }
+
+        // Resume the audio player, if suspended
+        if (this.json.request.intent
+            && this.context.device.audioPlayerSupported()
+            && this.context.audioPlayer.suspended()) {
+            await this.context.audioPlayer.resume();
+        }
+
+        return new SkillResponse(result);
     }
 
     /**
@@ -304,63 +377,5 @@ export class SkillRequest {
     public slotStatus(slotName: string, confirmationStatus: ConfirmationStatus): SkillRequest {
         this.context.dialogManager.slots()[slotName].confirmationStatus = confirmationStatus;
         return this;
-    }
-
-    private baseRequest(): any {
-        const applicationId = this.context.applicationID();
-        const requestId = "amzn1.echo-external.request." + uuid.v4();
-        const timestamp = new Date().toISOString().substring(0, 19) + "Z";
-
-        // First create the header part of the request
-        const baseRequest: any = {
-            context: {
-                System: {
-                    application: {
-                        applicationId,
-                    },
-                    device: {
-                        supportedInterfaces: this.context.device.supportedInterfaces(),
-                    },
-                    user: SkillRequest.userObject(this.context),
-                },
-            },
-            request: {
-                locale: this.context.locale(),
-                requestId,
-                timestamp,
-            },
-            version: "1.0",
-        };
-
-        // If the device ID is set, we set the API endpoint and deviceId properties
-        if (this.context.device.id()) {
-            baseRequest.context.System.apiAccessToken = this.context.apiAccessToken;
-            baseRequest.context.System.apiEndpoint = this.context.apiEndpoint;
-            baseRequest.context.System.device.deviceId = this.context.device.id();
-        }
-
-        if (this.context.accessToken !== null) {
-            baseRequest.context.System.user.accessToken = this.context.accessToken;
-        }
-
-        // If display enabled, we add a display object to context
-        if (this.context.device.displaySupported()) {
-            baseRequest.context.Display = {};
-        }
-        return baseRequest;
-    }
-
-    private static userObject(context: SkillContext): any {
-        const o: any = {
-            userId: context.user.id(),
-        };
-
-        // If we have a device ID, means we have permissions enabled and a consent token
-        if (context.device.id()) {
-            o.permissions = {
-                consentToken: uuid.v4(),
-            };
-        }
-        return o;
     }
 }

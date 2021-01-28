@@ -21,6 +21,7 @@ export class VirtualAlexa {
 
     /** @internal */
     private readonly _interactor: SkillInteractor;
+    private requestFilter: RequestFilter;
     public readonly addressAPI: AddressAPI;
     public readonly userAPI: UserAPI;
     public readonly context: SkillContext;
@@ -36,23 +37,14 @@ export class VirtualAlexa {
         this.dynamoDB = new DynamoDB();
     }
 
-    // Invoke virtual alexa with constructed skill request
-    // @internal
-    public call(skillRequest: SkillRequest): Promise<SkillResponse> {
-        return this._interactor.callSkill(skillRequest);
-    }
-
     /**
      * Sends a SessionEndedRequest to the skill
      * Does not wait for a reply, as there should be none
-     * @returns {Promise<any>}
+     * @returns {Promise<SkillResponse>}
      */
     public endSession(sessionEndedReason: SessionEndedReason = SessionEndedReason.USER_INITIATED,
             errorData?: any): Promise<SkillResponse> {
-        const serviceRequest = new SkillRequest(this);
-        // Convert to enum value and send request
-        serviceRequest.sessionEnded(sessionEndedReason, errorData);
-        return this.call(serviceRequest);
+        return this.request().sessionEnded(sessionEndedReason, errorData).send();
     }
 
     /**
@@ -61,12 +53,12 @@ export class VirtualAlexa {
      * @returns {VirtualAlexa}
      */
     public filter(requestFilter: RequestFilter): VirtualAlexa {
-        this._interactor.filter(requestFilter);
+        this.requestFilter = requestFilter;
         return this;
     }
 
     public resetFilter(): VirtualAlexa {
-        this._interactor.filter(undefined);
+        this.requestFilter = undefined;
         return this;
     }
 
@@ -74,10 +66,10 @@ export class VirtualAlexa {
      * Sends the specified intent, with the optional map of slot values
      * @param {string} intentName
      * @param {[id: string]: string} slots
-     * @returns {SkillRequest}
+     * @returns {Promise<SkillResponse>}
      */
     public intend(intentName: string, slots?: {[id: string]: string}): Promise<SkillResponse> {
-        return this.call(new SkillRequest(this).intent(intentName).slots(slots));
+        return this.request().intent(intentName).slots(slots).send();
     }
 
     /**
@@ -86,30 +78,30 @@ export class VirtualAlexa {
      * Useful for highly customized JSON requests
      */
     public request(): SkillRequest {
-        return new SkillRequest(this);
+        return new SkillRequest(this.context, this._interactor, this.requestFilter);
     }
     
     /**
      * Sends a Display.ElementSelected request with the specified token
      * @param {string} token
-     * @returns {SkillRequest}
+     * @returns {Promise<SkillResponse>}
      */
     public selectElement(token: any): Promise<SkillResponse> {
-        return this.call(new SkillRequest(this).elementSelected(token));
+        return this.request().elementSelected(token).send();
     }
 
     /**
      * Sends a launch request to the skill
-     * @returns {SkillRequest}
+     * @returns {Promise<SkillResponse>}
      */
     public launch(): Promise<SkillResponse> {
-        return this.call(new SkillRequest(this).launch());
+        return this.request().launch().send();
     }
 
     /**
      * Sends the specified utterance as an Intent request to the skill
      * @param {string} utteranceString
-     * @returns {SkillRequest}
+     * @returns {Promise<SkillResponse>}
      */
     public utter(utteranceString: string): Promise<SkillResponse> {
         if (utteranceString === "exit") {
@@ -131,10 +123,10 @@ export class VirtualAlexa {
                 + " to an intent. Try a different utterance, or explicitly set the intent");
         }
 
-        const request = new SkillRequest(this)
+        return this.request()
             .intent(utterance.intent())
-            .slots(utterance.toJSON());
-        return this.call(request);
+            .slots(utterance.toJSON())
+            .send();
     }
 
     private static parseLaunchRequest(utter: string): string | boolean {
@@ -336,7 +328,7 @@ export class VirtualAlexaBuilder {
         }
 
         const alexa = new VirtualAlexa(interactor, model, this._locale, this._applicationID);
-        (interactor as any)._alexa = alexa;
+        (interactor as any) = alexa;
         return alexa;
     }
 }

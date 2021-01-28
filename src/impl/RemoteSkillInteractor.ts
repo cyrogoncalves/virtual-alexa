@@ -10,7 +10,7 @@ export class RemoteSkillInteractor extends SkillInteractor {
         super();
     }
 
-    protected invoke(requestJSON: any): Promise<any> {
+    invoke(requestJSON: any): Promise<any> {
         const httpModule: any = this.urlString.startsWith("https") ? https : http;
         const url = URL.parse(this.urlString);
         const requestString = JSON.stringify(requestJSON);

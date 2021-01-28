@@ -1,30 +1,18 @@
 import * as uuid from "uuid";
 
 export class Device {
-    private _id: string;
-    private _supportedInterfaces: any = {};
+    readonly supportedInterfaces: any = {};
 
     /** @internal */
-    public constructor(id?: string) {
-        this._id = id;
+    public constructor(public id?: string) {
         // By default, we support the AudioPlayer
         this.audioPlayerSupported(true);
     }
 
-    public id(): string {
-        return this._id;
-    }
-
     public generatedID(): void {
-        if (this._id) {
-            return;
+        if (!this.id) {
+            this.id = "virtualAlexa.deviceID." + uuid.v4();
         }
-
-        this._id = "virtualAlexa.deviceID." + uuid.v4();
-    }
-
-    public setID(id: string) {
-        this._id = id;
     }
 
     public audioPlayerSupported(value?: boolean): boolean {
@@ -39,19 +27,14 @@ export class Device {
         return this.supportedInterface("VideoApp", value);
     }
 
-    public supportedInterfaces(): any {
-        return this._supportedInterfaces;
-    }
-
     private supportedInterface(name: string, value?: boolean): boolean {
         if (value !== undefined) {
             if (value === true) {
-                this._supportedInterfaces[name] = {};
+                this.supportedInterfaces[name] = {};
             } else {
-                delete this._supportedInterfaces[name];
+                delete this.supportedInterfaces[name];
             }
         }
-        return this._supportedInterfaces[name] !== undefined;
+        return this.supportedInterfaces[name] !== undefined;
     }
-
 }

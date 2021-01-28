@@ -601,7 +601,7 @@ describe("VirtualAlexa Tests Using JSON", function() {
                 .sampleUtterances(sampleUtterances)
                 .intentSchema(intentSchema)
                 .create();
-            virtualAlexa.context.device.setID("testID");
+            virtualAlexa.context.device.id = "testID";
             virtualAlexa.context.device.audioPlayerSupported(true);
             virtualAlexa.context.device.displaySupported(true);
             virtualAlexa.context.device.videoAppSupported(true);
@@ -625,7 +625,7 @@ describe("VirtualAlexa Tests Using JSON", function() {
                 .sampleUtterances(sampleUtterances)
                 .intentSchema(intentSchema)
                 .create();
-            virtualAlexa.context.device.setID("testID");
+            virtualAlexa.context.device.id = "testID";
             virtualAlexa.context.device.audioPlayerSupported(false);
 
             await virtualAlexa.filter((request) => {
@@ -717,7 +717,7 @@ describe("VirtualAlexa Tests Using JSON", function() {
 
             virtualAlexa.launch().then(() => {
                 virtualAlexa.utter("stop").then(() => {
-                    assert.isUndefined(virtualAlexa.context.session());
+                    assert.isUndefined(virtualAlexa.context.session);
                     done();
                 });
             });
@@ -839,7 +839,7 @@ describe("Echo Show Tests", () => {
             .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
-        virtualAlexa.context.device.setID("testID");
+        virtualAlexa.context.device.id = "testID";
         virtualAlexa.context.device.audioPlayerSupported(false);
         virtualAlexa.context.device.displaySupported(true);
 
@@ -858,7 +858,7 @@ describe("Echo Show Tests", () => {
             .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
             .intentSchemaFile("./test/resources/IntentSchema.json")
             .create();
-        virtualAlexa.context.device.setID("testID");
+        virtualAlexa.context.device.id = "testID";
         virtualAlexa.context.device.audioPlayerSupported(false);
         virtualAlexa.context.device.displaySupported(true);
 

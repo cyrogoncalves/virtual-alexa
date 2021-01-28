@@ -1,5 +1,5 @@
-import {RequestType, SessionEndedReason, SkillRequest} from "../core/SkillRequest";
-import {AudioItem} from "./AudioItem";
+import { RequestType, SessionEndedReason } from "../core/SkillRequest";
+import { AudioItem } from "./AudioItem";
 import { VirtualAlexa } from "../core/VirtualAlexa";
 
 export enum AudioPlayerActivity {
@@ -140,9 +140,9 @@ export class AudioPlayer {
 
     private async audioPlayerRequest(requestType: string): Promise<any> {
         const nowPlaying = this.playing();
-        const serviceRequest = new SkillRequest(this._alexa);
-        serviceRequest.audioPlayer(requestType, nowPlaying.stream.token, nowPlaying.stream.offsetInMilliseconds);
-        return serviceRequest.send();
+        return this._alexa.request()
+            .audioPlayer(requestType, nowPlaying.stream.token, nowPlaying.stream.offsetInMilliseconds)
+            .send();
     }
 
     private async enqueue(audioItem: AudioItem, playBehavior: string): Promise<void> {

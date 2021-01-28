@@ -6,7 +6,7 @@ export class LocalSkillInteractor extends SkillInteractor {
         super();
     }
 
-    protected invoke(requestJSON: any): Promise<any> {
+    invoke(requestJSON: any): Promise<any> {
         // If this is a string, means we need to parse it to find the filename and function name
         // Otherwise, we assume it is a function, and just invoke the function directly
         const handlerFunction = typeof this.handler === "string" ? LocalSkillInteractor.getFunction(this.handler) : this.handler;

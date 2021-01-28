@@ -3,8 +3,6 @@ import {AudioPlayer} from "../audioPlayer/AudioPlayer";
 import {DialogManager} from "../dialog/DialogManager";
 import {InteractionModel} from "../model/InteractionModel";
 import {Device} from "./Device";
-import {SkillSession} from "./SkillSession";
-import {User} from "./User";
 
 /**
  * Manages state of the Alexa device interaction across sessions.
@@ -20,7 +18,7 @@ export class SkillContext {
     public readonly device: Device;
     /** @internal */
     public readonly dialogManager: DialogManager;
-    public readonly user: User;
+    public readonly userId: string;
     private _session: SkillSession;
 
     /** @internal */
@@ -34,7 +32,7 @@ export class SkillContext {
         this.apiEndpoint = "https://api.amazonalexa.com";
         this.dialogManager = new DialogManager(this);
         this.device = new Device();
-        this.user = new User();
+        this.userId = "amzn1.ask.account." + uuid.v4();
         this._session = new SkillSession();
     }
 
@@ -52,7 +50,7 @@ export class SkillContext {
         this._session = new SkillSession();
     }
 
-    public session(): SkillSession {
+    get session(): SkillSession {
         return this._session;
     }
 
@@ -60,8 +58,13 @@ export class SkillContext {
         this.dialogManager.reset();
         this._session = undefined;
     }
+}
 
-    public activeSession(): boolean {
-        return this._session !== undefined;
-    }
+/**
+ * Information about the current open session on the Alexa emulator
+ */
+export class SkillSession {
+    attributes: {[id: string]: any} = {};
+    new = true;
+    id: string = "SessionID." + uuid.v4();
 }
