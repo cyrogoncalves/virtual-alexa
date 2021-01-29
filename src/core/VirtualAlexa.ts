@@ -327,8 +327,6 @@ export class VirtualAlexaBuilder {
             throw new Error("Either a handler or skillURL must be provided.");
         }
 
-        const alexa = new VirtualAlexa(interactor, model, this._locale, this._applicationID);
-        (interactor as any) = alexa;
-        return alexa;
+        return new VirtualAlexa(interactor, model, this._locale, this._applicationID);
     }
 }

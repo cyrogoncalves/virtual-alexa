@@ -1,8 +1,7 @@
 import * as fs from "fs";
-import { SlotTypes } from '../virtualCore/SlotTypes';
+import { BuiltinSlotTypes, SlotType } from '../virtualCore/SlotTypes';
 import { SampleUtterances } from '../virtualCore/SampleUtterances';
 import { DialogIntent } from "../dialog/DialogIntent";
-import { BuiltinSlotTypes } from "./BuiltinSlotTypes";
 import { AudioPlayerIntents, BuiltinUtterances } from "./BuiltinUtterances";
 import { IntentSchema } from "./IntentSchema";
 import { SampleUtterancesBuilder } from "./SampleUtterancesBuilder";
@@ -64,19 +63,12 @@ export class InteractionModel {
             }
         }
 
-        let slotTypes;
-        if (languageModel.types) {
-            slotTypes = new SlotTypes(languageModel.types);
-        }
         const schema = new IntentSchema(schemaJSON);
         const samples = SampleUtterancesBuilder.fromJSON(sampleJSON);
-
         const prompts = promptsElement?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
-
         const dialogIntents = dialogElement?.intents.map((dialogIntent: any) =>
             DialogIntent.fromJSON(interactionModel, dialogIntent)) ?? [];
-
-        return new InteractionModel(schema, samples, slotTypes, prompts, dialogIntents);
+        return new InteractionModel(schema, samples, languageModel.types || [], prompts, dialogIntents);
     }
 
     public static fromLocale(locale: string): InteractionModel {
@@ -88,18 +80,20 @@ export class InteractionModel {
         return InteractionModel.fromFile(modelPath);
     }
 
+    public readonly slotTypes?: SlotType[];
+
     public constructor(public intentSchema: IntentSchema,
                        public sampleUtterances: SampleUtterances,
-                       public slotTypes?: SlotTypes,
+                       slotTypesObj: any[] = [],
                        public prompts?: SlotPrompt[],
                        public dialogIntents?: DialogIntent[]) {
-        if (!this.slotTypes) {
-            this.slotTypes = new SlotTypes([]);
-        }
-        this.slotTypes.addTypes(BuiltinSlotTypes.values());
+        this.slotTypes = [
+            ...slotTypesObj.map(type => new SlotType(type.name, type.values)),
+            ...BuiltinSlotTypes.values()
+        ];
 
         // In bootstrapping the interaction model, we pass it to its children
-        this.sampleUtterances.setInteractionModel(this);
+        this.sampleUtterances.interactionModel = this;
 
         this.dialogIntents?.forEach(dialogIntent => dialogIntent.interactionModel = this);
 
@@ -108,8 +102,7 @@ export class InteractionModel {
         // We add each phrase one-by-one
         // It is possible the built-ins have additional samples defined
         for (const key of Object.keys(builtinValues)) {
-            const isSupportedIntent = this.isSupportedIntent(isAudioPlayerSupported, key);
-            if (isSupportedIntent) {
+            if (this.isSupportedIntent(isAudioPlayerSupported, key)) {
                 intentSchema.addIntent(key);
                 for (const phrase of builtinValues[key]) {
                     this.sampleUtterances.addSample(key, phrase);

@@ -17,35 +17,25 @@ export enum AudioPlayerActivity {
 export class AudioPlayer {
     /** @internal */
     private static DIRECTIVE_PLAY = "AudioPlayer.Play";
-
     /** @internal */
     private static DIRECTIVE_STOP = "AudioPlayer.Stop";
-
     /** @internal */
     private static PLAY_BEHAVIOR_REPLACE_ALL = "REPLACE_ALL";
-
     /** @internal */
     private static PLAY_BEHAVIOR_ENQUEUE = "ENQUEUE";
-
     /** @internal */
     private static PLAY_BEHAVIOR_REPLACE_ENQUEUED = "REPLACE_ENQUEUED";
-
     /** @internal */
     private _playing: AudioItem = null;
-
     /** @internal */
     private _queue: AudioItem[] = [];
-
     /** @internal */
-    private _activity: AudioPlayerActivity = null;
-
+    private _activity: AudioPlayerActivity = AudioPlayerActivity.IDLE;
     /** @internal */
     private _suspended: boolean = false;
 
     /** @internal */
-    public constructor(private _alexa: VirtualAlexa) {
-        this._activity = AudioPlayerActivity.IDLE;
-    }
+    public constructor(private _alexa: VirtualAlexa) {}
 
     /**
      * Convenience method to check if the AudioPlayer is playing
@@ -75,7 +65,7 @@ export class AudioPlayer {
         const promise = this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_FINISHED);
 
         // Go the next track, if there is one
-        this.playNext();
+        this.playNext(this._alexa);
         return promise;
     }
 
@@ -154,16 +144,14 @@ export class AudioPlayer {
                 await this.playbackStopped();
             }
 
-            this._queue = [];
-            this._queue.push(audioItem);
+            this._queue = [audioItem];
 
         } else if (playBehavior === AudioPlayer.PLAY_BEHAVIOR_REPLACE_ENQUEUED) {
-            this._queue = [];
-            this._queue.push(audioItem);
+            this._queue = [audioItem];
         }
 
         if (!this.isPlaying()) {
-            await this.playNext();
+            await this.playNext(this._alexa);
         }
     }
 
@@ -183,32 +171,29 @@ export class AudioPlayer {
         }
     }
 
-    private dequeue(): AudioItem {
-        const audioItem = this._queue[0];
-        this._queue = this._queue.slice(1);
-        return audioItem;
-    }
-
-    private async playNext() {
+    private async playNext(_alexa: VirtualAlexa) {
         if (this._queue.length === 0) {
             return;
         }
 
-        this._playing = this.dequeue();
+        // dequeue
+        const audioItem = this._queue[0];
+        this._queue = this._queue.slice(1);
+        this._playing = audioItem;
+
         // If the URL for AudioItem is http, we throw an error
         if (!this._playing.stream.url) {
-            return this._alexa.endSession(SessionEndedReason.ERROR, {
+            return _alexa.endSession(SessionEndedReason.ERROR, {
                 message: "The URL specified in the Play directive must be defined and a valid HTTPS url",
                 type: "INVALID_RESPONSE",
             });  
         } else if (this._playing.stream.url.startsWith("http:")) {
-            return this._alexa.endSession(SessionEndedReason.ERROR, {
+            return _alexa.endSession(SessionEndedReason.ERROR, {
                 message: "The URL specified in the Play directive must be HTTPS",
                 type: "INVALID_RESPONSE",
             });
         } else {
             return this.playbackStarted();
-
         }
     }
 }

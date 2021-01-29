@@ -1,5 +1,5 @@
-import {InteractionModel} from "../model/InteractionModel";
-import {SlotPrompt} from "../model/SlotPrompt";
+import { InteractionModel } from "../model/InteractionModel";
+import { SlotPrompt } from "../model/SlotPrompt";
 
 export class DialogIntent {
     public static fromJSON(interactionModel: InteractionModel, json: any): DialogIntent {
@@ -24,7 +24,7 @@ export class DialogIntent {
 }
 
 export class DialogSlot {
-    public static fromJSON(dialogIntent: DialogIntent, json: any) {
+    public static fromJSON(dialogIntent: DialogIntent, json: any): DialogSlot {
         const slot = new DialogSlot(dialogIntent);
         Object.assign(slot, json);
         return slot;
@@ -39,12 +39,10 @@ export class DialogSlot {
     public constructor(public dialogIntent: DialogIntent) {}
 
     public elicitationPrompt(): SlotPrompt {
-        const id = this.prompts.elicitation;
-        return this.dialogIntent.interactionModel.prompt(id);
+        return this.dialogIntent.interactionModel.prompt(this.prompts.elicitation);
     }
 
     public confirmationPrompt(): SlotPrompt {
-        const id = this.prompts.confirmation;
-        return this.dialogIntent.interactionModel.prompt(id);
+        return this.dialogIntent.interactionModel.prompt(this.prompts.confirmation);
     }
 }

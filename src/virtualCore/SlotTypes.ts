@@ -1,41 +1,5 @@
 export class SlotTypes {
-  public types: SlotType[];
-
-  public constructor(slotTypes: ISlotType[]) {
-    this.types = [];
-    for (const type of slotTypes) {
-      this.types.push(new SlotType(type.name, type.values));
-    }
-  }
-
-  public addTypes(slotTypes: SlotType[]) {
-    this.types = this.types.concat(slotTypes);
-  }
-
-  public slotType(name: string): SlotType {
-    let slotType;
-    name = name.toLowerCase();
-    for (const o of this.types) {
-      if (o.name.toLowerCase() === name) {
-        slotType = o;
-        break;
-      }
-    }
-
-    return slotType;
-  }
-
-  public matchesSlot(name: string, value: string): SlotMatch {
-    const slotType = this.slotType(name);
-    // If no slot type definition is provided, we just assume it is a match
-    if (!slotType) {
-      const match = new SlotMatch(true, value);
-      match.untyped = true;
-      return match;
-    }
-
-    return slotType.match(value);
-  }
+  public types: SlotType[] = [];
 }
 
 export class SlotMatch {
@@ -48,11 +12,8 @@ export class SlotMatch {
   }
 }
 
-export class SlotType implements ISlotType {
-  public constructor(public name: string, public values?: ISlotValue[]) {
-    if (!values) {
-      this.values = [];
-    }
+export class SlotType {
+  public constructor(public name: string, public values: ISlotValue[] = []) {
     for (const value of this.values) {
       // We default builtin to false
       if (value.builtin === undefined) {
@@ -62,33 +23,18 @@ export class SlotType implements ISlotType {
   }
 
   public isEnumerated() {
-    return !this.isBuiltin();
+    return this.name === "AMAZON.NUMBER" || !this.name.startsWith("AMAZON");
   }
 
   public isCustom() {
-    let custom = false;
-    if (this.isBuiltin()) {
-      for (const value of this.values) {
-        if (!value.builtin) {
-          custom = true;
-          break;
-        }
-      }
-    } else {
-      custom = true;
-    }
-    return custom;
-  }
-
-  public isBuiltin() {
-    return this.name.startsWith("AMAZON");
+    return !this.name.startsWith("AMAZON") || this.values.some(value => !value.builtin) || undefined;
   }
 
   public match(value: string): SlotMatch {
     const matches = this.matchAll(value);
     if (matches.length > 0) {
       return matches[0];
-    } else if (this.isBuiltin() && !this.isEnumerated()) {
+    } else if (this.name.startsWith("AMAZON") && !this.isEnumerated()) {
       // If this is a builtin, we still count it as a match, because we treat these as free form
       // Unless we explicilty have enumerated the builtin - we have rarely done this so far
       return new SlotMatch(true, value);
@@ -119,18 +65,65 @@ export class SlotType implements ISlotType {
   }
 }
 
-export interface ISlotType {
-  name: string;
-  values?: ISlotValue[];
-}
-
-export interface ISlotValue {
+interface ISlotValue {
   id?: string;
   builtin?: boolean;
-  name: ISlotValueName;
+  name: {
+    value: string;
+    synonyms: string[];
+  };
 }
 
-export interface ISlotValueName {
-  value: string;
-  synonyms: string[];
+export class BuiltinSlotTypes {
+  private static LONG_FORM_VALUES: {[id: string]: string []} = {
+    1: ["one"],
+    2: ["two"],
+    3: ["three"],
+    4: ["four"],
+    5: ["five"],
+    6: ["six"],
+    7: ["seven"],
+    8: ["eight"],
+    9: ["nine"],
+    10: ["ten"],
+    11: ["eleven"],
+    12: ["twelve"],
+    13: ["thirteen"],
+    14: ["fourteen"],
+    15: ["fifteen"],
+    16: ["sixteen"],
+    17: ["seventeen"],
+    18: ["eighteen"],
+    19: ["nineteen"],
+    20: ["twenty"],
+  };
+
+  private static LONG_FORM_SLOT_VALUES(): ISlotValue[] {
+    return Object.keys(BuiltinSlotTypes.LONG_FORM_VALUES).map(key => ({
+      id: key,
+      builtin: true,
+      name: {
+        value: key,
+        synonyms: BuiltinSlotTypes.LONG_FORM_VALUES[key]
+      }
+    }));
+  }
+
+  public static values(): BuiltinSlotType[] {
+    return [
+      new BuiltinSlotType("AMAZON.NUMBER", BuiltinSlotTypes.LONG_FORM_SLOT_VALUES(), "^[0-9]*$"),
+    ];
+  }
+}
+
+class BuiltinSlotType extends SlotType {
+  public constructor(public name: string, public values: ISlotValue[], private regex?: string) {
+    super(name, values);
+  }
+
+  public match(value: string): SlotMatch {
+    value = value.trim();
+    // Some slot types use regex - we use that if specified
+    return this.regex && value.match(this.regex) ? new SlotMatch(true, value) : super.match(value);
+  }
 }

@@ -9,16 +9,16 @@ import { RequestFilter } from './VirtualAlexa';
 import { SkillInteractor } from '../impl/SkillInteractor';
 
 
-export class RequestType {
-    public static CONNECTIONS_RESPONSE = "Connections.Response";
-    public static DISPLAY_ELEMENT_SELECTED_REQUEST = "Display.ElementSelected";
-    public static INTENT_REQUEST = "IntentRequest";
-    public static LAUNCH_REQUEST = "LaunchRequest";
-    public static SESSION_ENDED_REQUEST = "SessionEndedRequest";
-    public static AUDIO_PLAYER_PLAYBACK_FINISHED = "AudioPlayer.PlaybackFinished";
-    public static AUDIO_PLAYER_PLAYBACK_NEARLY_FINISHED = "AudioPlayer.PlaybackNearlyFinished";
-    public static AUDIO_PLAYER_PLAYBACK_STARTED = "AudioPlayer.PlaybackStarted";
-    public static AUDIO_PLAYER_PLAYBACK_STOPPED = "AudioPlayer.PlaybackStopped";
+export enum RequestType {
+    CONNECTIONS_RESPONSE = "Connections.Response",
+    DISPLAY_ELEMENT_SELECTED_REQUEST = "Display.ElementSelected",
+    INTENT_REQUEST = "IntentRequest",
+    LAUNCH_REQUEST = "LaunchRequest",
+    SESSION_ENDED_REQUEST = "SessionEndedRequest",
+    AUDIO_PLAYER_PLAYBACK_FINISHED = "AudioPlayer.PlaybackFinished",
+    AUDIO_PLAYER_PLAYBACK_NEARLY_FINISHED = "AudioPlayer.PlaybackNearlyFinished",
+    AUDIO_PLAYER_PLAYBACK_STARTED = "AudioPlayer.PlaybackStarted",
+    AUDIO_PLAYER_PLAYBACK_STOPPED = "AudioPlayer.PlaybackStopped",
 }
 
 export enum SessionEndedReason {
@@ -184,8 +184,11 @@ export class SkillRequest {
             });
 
         if (this.context.interactionModel.dialogIntent(intentName)) {
-            // Update the internal state of the dialog manager based on this request
-            this.context.dialogManager.handleRequest(this);
+            // Update the request JSON to have the correct dialog state
+            this.json.request.dialogState = this.context.dialogManager.handleRequest();
+
+            // Update the state of the slots in the dialog manager
+            this.context.dialogManager.updateSlotStates(this.json.request.intent.slots);
 
             // Our slots can just be taken from the dialog manager now
             //  It has the complete current state of the slot values for the dialog intent
@@ -264,7 +267,7 @@ export class SkillRequest {
     public sessionEnded(reason: SessionEndedReason, errorData?: any): SkillRequest {
         this.requestType(RequestType.SESSION_ENDED_REQUEST);
         this.json.request.reason = SessionEndedReason[reason];
-        if (errorData !== undefined && errorData !== null) {
+        if (errorData) {
             this.json.request.error = errorData;
         }
         return this;
@@ -289,18 +292,23 @@ export class SkillRequest {
      */
     public slot(slotName: string, slotValue: string, confirmationStatus = ConfirmationStatus.NONE): SkillRequest {
         const intent = this.context.interactionModel.intentSchema.intent(this.json.request.intent.name);
-
-        const intentSlots = intent.slots;
-        if (!intentSlots) {
+        if (!intent.slots) {
             throw new Error("Trying to add slot to intent that does not have any slots defined");
         }
 
-        if (!intent.slotForName(slotName)) {
+        const slotValueObject = new SlotValue(slotName, slotValue, confirmationStatus);
+        const slot = intent.slotForName(slotName);
+        if (!slot) {
             throw new Error("Trying to add undefined slot to intent: " + slotName);
         }
 
-        const slotValueObject = new SlotValue(slotName, slotValue, confirmationStatus);
-        slotValueObject.setEntityResolution(this.context, this.json.request.intent.name);
+        const slotType = this.context.interactionModel.slotTypes
+            .find(o => o.name.toLowerCase() === slot.type.toLowerCase());
+        // We only include the entity resolution for builtin types if they have been extended
+        //  and for all custom slot types
+        if (slotType?.isCustom()) {
+            slotValueObject.setEntityResolution(this.context.applicationID(), slotType);
+        }
         this.json.request.intent.slots[slotName] = slotValueObject;
 
         if (this.context.interactionModel.dialogIntent(this.json.request.intent.name)) {
@@ -343,7 +351,7 @@ export class SkillRequest {
         if (result.response?.directives) {
             await this.context.audioPlayer.directivesReceived(result.response.directives);
             // Update the dialog manager based on the results
-            this.context.dialogManager.handleDirective(result);
+            this.context.dialogManager.handleDirective(result.response.directives, this.context);
         }
 
         // Resume the audio player, if suspended

@@ -9,8 +9,25 @@ export class LocalSkillInteractor extends SkillInteractor {
     invoke(requestJSON: any): Promise<any> {
         // If this is a string, means we need to parse it to find the filename and function name
         // Otherwise, we assume it is a function, and just invoke the function directly
-        const handlerFunction = typeof this.handler === "string" ? LocalSkillInteractor.getFunction(this.handler) : this.handler;
-        return LocalSkillInteractor.invokeFunction(handlerFunction, requestJSON);
+        const handlerFunction: (...args: any[]) => any = typeof this.handler === "string"
+            ? LocalSkillInteractor.getFunction(this.handler) : this.handler;
+        return new Promise<any>((resolve, reject) => {
+            const callback = (error: Error, result: any) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(result);
+                }
+            };
+
+            const context = new LambdaContext(callback);
+            const promise = handlerFunction(requestJSON, context, callback);
+            // For Node8, lambdas can return a promise - if they do, we call the context object with results
+            if (promise) {
+                promise.then((result: any) => context.done(null, result))
+                    .catch((error: any) => context.done(error, null));
+            }
+        });
     }
 
     private static getFunction(handler: string): (...args: any[]) => void {
@@ -28,29 +45,6 @@ export class LocalSkillInteractor extends SkillInteractor {
         const fullPath = path.isAbsolute(fileName) ? fileName : path.join(process.cwd(), fileName);
         const handlerModule = require(fullPath);
         return handlerModule[functionName];
-    }
-
-    private static invokeFunction(lambdaFunction: (...args: any[]) => any, event: any): Promise<any> {
-        return new Promise<any>((resolve, reject) => {
-            const callback = (error: Error, result: any) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(result);
-                }
-            };
-
-            const context = new LambdaContext(callback);
-            const promise = lambdaFunction(event, context, callback);
-            // For Node8, lambdas can return a promise - if they do, we call the context object with results
-            if (promise) {
-                promise.then((result: any) => {
-                    context.done(null, result);
-                }).catch((error: any) => {
-                    context.done(error, null);
-                });
-            }
-        });
     }
 }
 
@@ -81,18 +75,6 @@ class LambdaContext {
     }
 
     public done(error: Error, body: any) {
-        let statusCode: number = 200;
-        let contentType: string = "application/json";
-        let bodyString: string;
-
-        if (error === null) {
-            bodyString = JSON.stringify(body);
-        } else {
-            statusCode = 500;
-            contentType = "text/plain";
-            bodyString = "Unhandled Exception from Lambda: " + error.toString();
-        }
-
         this.callback(error, body);
     }
 }

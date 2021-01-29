@@ -1,22 +1,10 @@
-import {SlotMatch, SlotTypes} from "./SlotTypes";
-import { IntentSchema } from '../model/IntentSchema';
+import { SlotMatch } from "./SlotTypes";
 import { InteractionModel } from '../model/InteractionModel';
 
 export class SampleUtterances {
-  private _interactionModel: InteractionModel;
+  public interactionModel: InteractionModel;
 
   private samples: {[id: string]: SamplePhrase[]} = {};
-
-  // This is its own method, because it needs to be called at a particular point in initialization
-  // We call it after loading the sample utterances and intents, while initializing the interaction model
-  // Once we have the interaction model, we go back in add the builtin utterances
-  public setInteractionModel(interactionModel: InteractionModel) {
-    this._interactionModel = interactionModel;
-  }
-
-  public interactionModel(): InteractionModel {
-    return this._interactionModel;
-  }
 
   public addSample(intent: string, sample: string) {
     if (!(intent in this.samples)) {
@@ -165,11 +153,7 @@ export class SamplePhraseTest {
   }
 
   public slotValues(): string [] {
-    const values = [];
-    for (const slotMatch of this.slotMatches) {
-      values.push(slotMatch.value);
-    }
-    return values;
+    return this.slotMatches.map(slotMatch => slotMatch.value);
   }
 
   private checkSlots(input: string, slotValues: string []): SlotMatch[] | undefined {
@@ -182,20 +166,29 @@ export class SamplePhraseTest {
       // If the whole of the match is not a slot, make sure there is a leading or trailing space on the slot
       // This is to avoid matching a sample like "sample {slot}" with "sampleslot"
       // Ideally, this would be done as a regex - seemingly possible, but the regex is very confusing
-      if (input !== slotValue) {
-        if (slotValue.trim().length > 0 && !slotValue.startsWith(" ") && !slotValue.endsWith(" ")) {
-          return undefined;
-        }
+      if (input !== slotValue && slotValue.trim().length > 0 && !slotValue.startsWith(" ") && !slotValue.endsWith(" ")) {
+        return undefined;
       }
 
       const slotName = this.samplePhrase.slotName(index);
       // Look up the slot type for the name
-      const slotType = this.intentSchema().intent(this.samplePhrase.intent).slotForName(slotName);
+      const slotType = this.samplePhrase.sampleUtterances.interactionModel.intentSchema.intent(this.samplePhrase.intent).slotForName(slotName);
       if (!slotType) {
         throw new Error("Invalid schema - not slot: " + slotName + " for intent: " + this.samplePhrase.intent);
       }
 
-      const slotMatch = this.slotTypes().matchesSlot(slotType.type, slotValue);
+      const slotType2 = this.samplePhrase.sampleUtterances.interactionModel.slotTypes
+          .find(o => o.name.toLowerCase() === slotType.type.toLowerCase());
+      // If no slot type definition is provided, we just assume it is a match
+      let slotMatch;
+      if (!slotType2) {
+        const match = new SlotMatch(true, slotValue);
+        match.untyped = true;
+        slotMatch = match;
+      } else {
+        slotMatch = slotType2.match(slotValue);
+      }
+
       if (!slotMatch.matches) {
         return undefined;
 
@@ -206,13 +199,5 @@ export class SamplePhraseTest {
     }
 
     return result;
-  }
-
-  private intentSchema(): IntentSchema {
-    return this.samplePhrase.sampleUtterances.interactionModel().intentSchema;
-  }
-
-  private slotTypes(): SlotTypes {
-    return this.samplePhrase.sampleUtterances.interactionModel().slotTypes;
   }
 }

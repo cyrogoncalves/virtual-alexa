@@ -1,8 +1,4 @@
-import {DialogIntent} from "./DialogIntent";
-import {SkillContext} from "../core/SkillContext";
-import {SkillRequest} from "../core/SkillRequest";
-import {SkillResponse} from "../core/SkillResponse";
-import {SlotValue} from "../impl/SlotValue";
+import { SkillContext } from "../core/SkillContext";
 
 export enum ConfirmationStatus {
     CONFIRMED = "CONFIRMED",
@@ -17,34 +13,24 @@ export enum DialogState {
 }
 
 export class DialogManager {
-    private _delegated: boolean = false;
-    private _dialogIntent: DialogIntent = undefined;
-    private _confirmingSlot: SlotValue = undefined;
     private _confirmationStatus: ConfirmationStatus;
-    private _dialogState: DialogState = undefined;
+    private _dialogState: DialogState;
     private _slots: {[id: string]: any} = {};
-    public constructor(public context: SkillContext) {}
 
     /** @internal */
-    public handleDirective(response: SkillResponse): void {
+    public handleDirective(directives: any, context: SkillContext): void {
         // Look for a dialog directive - trigger dialog mode if so
-        for (const directive of response.response.directives) {
+        for (const directive of directives) {
             if (directive.type.startsWith("Dialog")) {
-                if (directive.updatedIntent) {
-                    this._dialogIntent = this.context.interactionModel.dialogIntent(directive.updatedIntent.name);
-                    if (!this.context.interactionModel.dialogIntent(directive.updatedIntent.name)) {
-                        throw new Error("No match for dialog name: " + directive.updatedIntent.name);
-                    }
+                if (directive.updatedIntent && !context.interactionModel.dialogIntent(directive.updatedIntent.name)) {
+                    throw new Error("No match for dialog name: " + directive.updatedIntent.name);
                 }
 
                 this._dialogState = this._dialogState ? DialogState.IN_PROGRESS : DialogState.STARTED;
                     
                 if (directive.type === "Dialog.Delegate") {
-                    this._delegated = true;
                     this._confirmationStatus = ConfirmationStatus.NONE;
-                } else if (directive.type === "Dialog.ElicitSlot"
-                    || directive.type === "Dialog.ConfirmSlot"
-                    || directive.type === "Dialog.ConfirmIntent") {
+                } else if (["Dialog.ElicitSlot", "Dialog.ConfirmSlot", "Dialog.ConfirmIntent"].includes(directive.type)) {
                     // Start the dialog if not started, otherwise mark as in progress
                     if (!this._confirmationStatus) {
                         this._confirmationStatus = ConfirmationStatus.NONE;
@@ -54,14 +40,10 @@ export class DialogManager {
                         this.updateSlotStates(directive.updatedIntent.slots);
                     }
 
-                    if (directive.type === "Dialog.ConfirmSlot") {
-                        const slotToConfirm = directive.slotToConfirm;
-                        this._confirmingSlot = this.slots()[slotToConfirm];
-                    } else if (directive.type === "Dialog.ConfirmIntent") {
+                    if (directive.type === "Dialog.ConfirmIntent") {
                         this._dialogState = DialogState.COMPLETED;
                     }
                 }
-
             }
         }
     }
@@ -78,28 +60,12 @@ export class DialogManager {
     }
 
     /** @internal */
-    public handleRequest(request: SkillRequest): void {
-        const intentName = request.json.request.intent.name;
-        if (this.context.interactionModel.dialogIntent(intentName)) {
-            // Set the dialog intent here - it may not be set by the skill in its response
-            this._dialogIntent = this.context.interactionModel.dialogIntent(intentName);
-
-            // Make sure the dialog state is set to started
-            if (!this._dialogState) {
-                this._dialogState = DialogState.STARTED;
-            }
-
-            // Update the request JSON to have the correct dialog state
-            request.json.request.dialogState = this._dialogState;
-
-            // Update the state of the slots in the dialog manager
-            this.context.dialogManager.updateSlotStates(request.json.request.intent.slots);
+    public handleRequest(): DialogState {
+        // Make sure the dialog state is set to started
+        if (!this._dialogState) {
+            this._dialogState = DialogState.STARTED;
         }
-    }
-
-    /** @internal */
-    public isDelegated() {
-        return this._delegated;
+        return this._dialogState;
     }
 
     /** @internal */
@@ -108,7 +74,9 @@ export class DialogManager {
     }
 
     public reset() {
-        this.dialogExited();
+        this._confirmationStatus = undefined;
+        this._dialogState = undefined;
+        this._slots = {};
     }
 
     /** @internal */
@@ -152,13 +120,5 @@ export class DialogManager {
             const newSlot = slots[slotName];
             this.updateSlot(slotName, newSlot);
         }
-    }
-
-    private dialogExited(): void {
-        this._confirmationStatus = undefined;
-        this._delegated = false;
-        this._dialogState = undefined;
-        this._dialogIntent = undefined;
-        this._slots = {};
     }
 }

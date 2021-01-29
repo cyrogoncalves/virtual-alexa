@@ -11,7 +11,9 @@ export class SkillResponse {
     public version: string;
 
     public constructor(rawJSON: any) {
-        this.wrapJSON(rawJSON);
+        for (const key of Object.keys(rawJSON)) {
+            (this as any)[key] = rawJSON[key];
+        }
     }
 
     /**
@@ -57,16 +59,7 @@ export class SkillResponse {
     }
 
     public directive(type: string): any {
-        let o;
-        if (this.response.directives) {
-            for (const directive of this.response.directives) {
-                if (directive.type === type) {
-                    o = directive;
-                    break;
-                }
-            }
-        }
-        return o;
+        return this.response.directives?.find((directive: any) => directive.type === type);
     }
 
     public display(): any {
@@ -76,7 +69,7 @@ export class SkillResponse {
     /**
      * Returns the primary text for a display template
      * If token is specified, grabs a list value for a list template
-     * @param {string} token
+     * @param {string} listItemToken
      * @returns {string | undefined}
      */
     public primaryText(listItemToken?: any): string | undefined {
@@ -86,7 +79,7 @@ export class SkillResponse {
     /**
      * Returns the secondary text for a display template
      * If token is specified, grabs a list value for a list template
-     * @param {string} token
+     * @param {string} listItemToken
      * @returns {string | undefined}
      */
     public secondaryText(listItemToken?: any): string | undefined {
@@ -96,7 +89,7 @@ export class SkillResponse {
     /**
      * Returns the tertiary text for a display template
      * If token is specified, grabs a list value for a list template
-     * @param {string} token
+     * @param {string} listItemToken
      * @returns {string | undefined}
      */
     public tertiaryText(listItemToken?: any): string | undefined {
@@ -115,13 +108,6 @@ export class SkillResponse {
             : _.get(this, "response.reprompt.outputSpeech.text");
     }
 
-    private wrapJSON(rawJSON: any) {
-        for (const key of Object.keys(rawJSON)) {
-            const value = rawJSON[key];
-            (this as any)[key] = value;
-        }
-    }
-
     private displayText(textElement: string, listItemToken?: string): string | undefined {
         const displayTemplate = this.display();
         if (!displayTemplate) {
@@ -135,8 +121,7 @@ export class SkillResponse {
                 }
             }
         } else {
-            const path = "textContent." + textElement + ".text";
-            return _.get(displayTemplate, path);
+            return _.get(displayTemplate, "textContent." + textElement + ".text");
         }
         return undefined;
     }

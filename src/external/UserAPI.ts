@@ -1,5 +1,5 @@
 import * as nock from "nock";
-import {SkillContext} from "../core/SkillContext";
+import { SkillContext } from "../core/SkillContext";
 
 export class UserAPI {
     /** @internal */
@@ -14,19 +14,6 @@ export class UserAPI {
     }
 
     /**
-     * Creates a object ready to be used by nock
-     * @param {IUserProfile} userProfile
-     * @param {string} property
-     */
-    private prepareNockResponse(userProfile: any, property: string): INockResponse {
-        if (userProfile[property]) {
-            return { responseCode: 200, payload: JSON.stringify(userProfile[property], null, 2)};
-        }
-        return {responseCode: 403}
-    }
-
-
-    /**
      * Sets the different properties in user profile as payload for the paths used in Alexa Profile Service
      * Paths mocked end with /v2/accounts/~current/settings/Profile.{key}
      * If the property is not present, returns a 403 error
@@ -37,9 +24,7 @@ export class UserAPI {
             nock.activate();
         }
 
-        const baseURL = this.context.apiEndpoint;
-        let scope = nock(baseURL)
-            .persist();
+        let scope = nock(this.context.apiEndpoint).persist();
 
         // Alexa User Profile possible paths
         // Full Name	/v2/accounts/~current/settings/Profile.name
@@ -47,31 +32,26 @@ export class UserAPI {
         // Email Address	/v2/accounts/~current/settings/Profile.email
         // Phone Number	/v2/accounts/~current/settings/Profile.mobileNumber
         ["name", "givenName", "email", "mobileNumber"].forEach((key) => {
-            const nockResponse = this.prepareNockResponse(userProfile, key);
-            scope = scope
-                    .get((path) => {
-                        return path === ("/v2/accounts/~current/settings/Profile."  + key);
-                    }).query(true)
-                    .reply(nockResponse.responseCode, nockResponse.payload);
+            const userProfileElement = (userProfile as any)[key];
+            const nockResponse = !userProfileElement ? {responseCode: 403} : {
+                responseCode: 200,
+                payload: JSON.stringify(userProfileElement, null, 2)
+            };
+            scope = scope.get(path => path === "/v2/accounts/~current/settings/Profile." + key)
+                .query(true)
+                .reply(nockResponse.responseCode, nockResponse.payload);
         });
 
         UserAPI.scope = scope;
     }
 }
 
-interface INockResponse {
-    responseCode: number;
-    payload?: string;
-}
-
-export interface IPhoneNumber {
-    countryCode: string,
-    phoneNumber: string,
-}
-
 export interface IUserProfile {
     name?: string,
     givenName?: string
     email?: string,
-    mobileNumber?: IPhoneNumber
+    mobileNumber?: {
+        countryCode: string,
+        phoneNumber: string,
+    }
 }

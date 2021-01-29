@@ -1,9 +1,7 @@
 import * as http from "http";
 import * as https from "https";
 import * as URL from "url";
-import {InteractionModel} from "../model/InteractionModel";
-import {SkillInteractor} from "./SkillInteractor";
-import {VirtualAlexa} from "../core/VirtualAlexa";
+import { SkillInteractor } from "./SkillInteractor";
 
 export class RemoteSkillInteractor extends SkillInteractor {
     public constructor(private urlString: string) {

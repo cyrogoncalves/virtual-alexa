@@ -1,5 +1,5 @@
 import { Utterance } from '../src/virtualCore/Utterance';
-import { SlotTypes } from '../src/virtualCore/SlotTypes';
+import { SlotType, SlotTypes } from '../src/virtualCore/SlotTypes';
 import {assert} from "chai";
 import {IntentSchema} from "../src/model/IntentSchema";
 import {InteractionModel} from "../src/model/InteractionModel";
@@ -91,12 +91,11 @@ describe("UtteranceTest", function() {
                 },
             },
         ],
-    }];
+    }] as SlotType[];
 
-    const is = IntentSchema.fromJSON(intentSchema);
     const model = new InteractionModel(IntentSchema.fromJSON(intentSchema),
         SampleUtterancesBuilder.fromJSON(sampleUtterances),
-        new SlotTypes(slotTypes));
+        slotTypes);
 
     const japaneseModel = InteractionModel.fromFile("./test/resources/japanese_skill/models/ja-JP.json");
 

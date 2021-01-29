@@ -2,7 +2,6 @@ import * as uuid from "uuid";
 import {AudioPlayer} from "../audioPlayer/AudioPlayer";
 import {DialogManager} from "../dialog/DialogManager";
 import {InteractionModel} from "../model/InteractionModel";
-import {Device} from "./Device";
 
 /**
  * Manages state of the Alexa device interaction across sessions.
@@ -30,7 +29,7 @@ export class SkillContext {
     ) {
         this.apiAccessToken = "virtualAlexa.accessToken." + uuid.v4();
         this.apiEndpoint = "https://api.amazonalexa.com";
-        this.dialogManager = new DialogManager(this);
+        this.dialogManager = new DialogManager();
         this.device = new Device();
         this.userId = "amzn1.ask.account." + uuid.v4();
         this._session = new SkillSession();
@@ -67,4 +66,43 @@ export class SkillSession {
     attributes: {[id: string]: any} = {};
     new = true;
     id: string = "SessionID." + uuid.v4();
+}
+
+export class Device {
+    readonly supportedInterfaces: any = {};
+
+    /** @internal */
+    public constructor(public id?: string) {
+        // By default, we support the AudioPlayer
+        this.audioPlayerSupported(true);
+    }
+
+    public generatedID(): void {
+        if (!this.id) {
+            this.id = "virtualAlexa.deviceID." + uuid.v4();
+        }
+    }
+
+    public audioPlayerSupported(value?: boolean): boolean {
+        return this.supportedInterface("AudioPlayer", value);
+    }
+
+    public displaySupported(value?: boolean): boolean {
+        return this.supportedInterface("Display", value);
+    }
+
+    public videoAppSupported(value?: boolean) {
+        return this.supportedInterface("VideoApp", value);
+    }
+
+    private supportedInterface(name: string, value?: boolean): boolean {
+        if (value !== undefined) {
+            if (value === true) {
+                this.supportedInterfaces[name] = {};
+            } else {
+                delete this.supportedInterfaces[name];
+            }
+        }
+        return this.supportedInterfaces[name] !== undefined;
+    }
 }

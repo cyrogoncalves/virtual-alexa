@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import { Intent, IntentSlot } from '../virtualCore/IIntentSchema';
 
 export class IntentSchema {
     public static fromFile(file: string): IntentSchema {
@@ -35,4 +34,33 @@ export class IntentSchema {
             this.schemaJSON.intents.push({intent});
         }
     }
+}
+
+export class Intent {
+    public builtin: boolean = false;
+    public slots: IntentSlot[] = null;
+    public constructor(public name: string, builtin?: boolean) {
+        this.builtin = builtin;
+    }
+
+    public addSlot(slot: IntentSlot): void {
+        if (this.slots === null) {
+            this.slots = [];
+        }
+
+        this.slots.push(slot);
+    }
+
+    public slotForName(name: string): IntentSlot {
+        for (const slot of this.slots) {
+            if (name.toLowerCase() === slot.name.toLowerCase()) {
+                return slot;
+            }
+        }
+        return undefined;
+    }
+}
+
+export class IntentSlot {
+    public constructor(public name: string, public type: string) {}
 }
