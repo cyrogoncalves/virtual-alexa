@@ -297,7 +297,7 @@ export class SkillRequest {
         }
 
         const slotValueObject = new SlotValue(slotName, slotValue, confirmationStatus);
-        const slot = intent.slotForName(slotName);
+        const slot = intent.slots?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase()) || undefined;
         if (!slot) {
             throw new Error("Trying to add undefined slot to intent: " + slotName);
         }

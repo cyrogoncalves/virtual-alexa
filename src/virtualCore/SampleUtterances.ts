@@ -172,13 +172,13 @@ export class SamplePhraseTest {
 
       const slotName = this.samplePhrase.slotName(index);
       // Look up the slot type for the name
-      const slotType = this.samplePhrase.sampleUtterances.interactionModel.intentSchema.intent(this.samplePhrase.intent).slotForName(slotName);
+      const interactionModel = this.samplePhrase.sampleUtterances.interactionModel;
+      const slotType = interactionModel.intentSchema.intent(this.samplePhrase.intent).slots?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase()) || undefined;
       if (!slotType) {
-        throw new Error("Invalid schema - not slot: " + slotName + " for intent: " + this.samplePhrase.intent);
+        throw new Error(`Invalid schema - not slot: ${slotName} for intent: ${this.samplePhrase.intent}`);
       }
 
-      const slotType2 = this.samplePhrase.sampleUtterances.interactionModel.slotTypes
-          .find(o => o.name.toLowerCase() === slotType.type.toLowerCase());
+      const slotType2 = interactionModel.slotTypes.find(o => o.name.toLowerCase() === slotType.type.toLowerCase());
       // If no slot type definition is provided, we just assume it is a match
       let slotMatch;
       if (!slotType2) {

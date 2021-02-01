@@ -1,11 +1,3 @@
-// Holder class for utterances for builtin intents
-// This could have been done as just a JSON file, but then requires build tool to include it in the lib dir
-export class BuiltinUtterances {
-    public static values(): {[id: string]: string[]} {
-        return values;
-    }
-}
-
 export const AudioPlayerIntents = [
     "AMAZON.PauseIntent",
     "AMAZON.ResumeIntent",
@@ -20,7 +12,7 @@ export const AudioPlayerIntents = [
     "AMAZON.StartOverIntent",
 ];
 
-const values = {
+export const AudioBuiltinIntents = {
     "AMAZON.CancelIntent": ["cancel", "never mind"],
     "AMAZON.HelpIntent": ["help", "help me"],
     "AMAZON.LoopOffIntent": ["loop off"],

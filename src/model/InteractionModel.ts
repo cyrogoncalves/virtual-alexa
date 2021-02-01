@@ -2,7 +2,7 @@ import * as fs from "fs";
 import { BuiltinSlotTypes, SlotType } from '../virtualCore/SlotTypes';
 import { SampleUtterances } from '../virtualCore/SampleUtterances';
 import { DialogIntent } from "../dialog/DialogIntent";
-import { AudioPlayerIntents, BuiltinUtterances } from "./BuiltinUtterances";
+import { AudioPlayerIntents, AudioBuiltinIntents } from "./BuiltinUtterances";
 import { IntentSchema } from "./IntentSchema";
 import { SampleUtterancesBuilder } from "./SampleUtterancesBuilder";
 import { SlotPrompt } from "./SlotPrompt";
@@ -97,7 +97,7 @@ export class InteractionModel {
 
         this.dialogIntents?.forEach(dialogIntent => dialogIntent.interactionModel = this);
 
-        const builtinValues = BuiltinUtterances.values();
+        const builtinValues: any = AudioBuiltinIntents;
         const isAudioPlayerSupported = this.audioPlayerSupported(intentSchema);
         // We add each phrase one-by-one
         // It is possible the built-ins have additional samples defined

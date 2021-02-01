@@ -11,14 +11,10 @@ export class IntentSchema {
         return new IntentSchema(schemaJSON);
     }
 
-    public constructor(public schemaJSON: any) {}
+    public constructor(private schemaJSON: { intents: any }) {}
 
     public intents(): Intent[] {
-        return this.schemaJSON.intents.map((intentJSON: any) => {
-            const intent = new Intent(intentJSON.intent);
-            intentJSON.slots?.forEach((slotJSON: any) => intent.addSlot(new IntentSlot(slotJSON.name, slotJSON.type)));
-            return intent;
-        });
+        return this.schemaJSON.intents.map((intentJSON: any) => ({ name: intentJSON.intent, slots: intentJSON.slots }));
     }
 
     public intent(intentString: string): Intent {
@@ -36,31 +32,10 @@ export class IntentSchema {
     }
 }
 
-export class Intent {
-    public builtin: boolean = false;
-    public slots: IntentSlot[] = null;
-    public constructor(public name: string, builtin?: boolean) {
-        this.builtin = builtin;
-    }
-
-    public addSlot(slot: IntentSlot): void {
-        if (this.slots === null) {
-            this.slots = [];
-        }
-
-        this.slots.push(slot);
-    }
-
-    public slotForName(name: string): IntentSlot {
-        for (const slot of this.slots) {
-            if (name.toLowerCase() === slot.name.toLowerCase()) {
-                return slot;
-            }
-        }
-        return undefined;
-    }
-}
-
-export class IntentSlot {
-    public constructor(public name: string, public type: string) {}
+export interface Intent {
+    name: string,
+    slots: {
+        name: string,
+        type: string
+    }[]
 }
