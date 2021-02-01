@@ -24,14 +24,7 @@ export class SlotMatch {
 }
 
 export class SlotType {
-  public constructor(public name: string, public values: ISlotValue[] = []) {
-    for (const value of this.values) {
-      // We default builtin to false
-      if (value.builtin === undefined) {
-        value.builtin = false;
-      }
-    }
-  }
+  public constructor(public name: string, public values: ISlotValue[] = []) {}
 
   public isEnumerated() {
     return this.name === "AMAZON.NUMBER" || !this.name.startsWith("AMAZON");

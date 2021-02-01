@@ -2,9 +2,8 @@ import * as fs from "fs";
 import { BuiltinSlotTypes, SlotType } from '../virtualCore/SlotTypes';
 import { SampleUtterances } from '../virtualCore/SampleUtterances';
 import { DialogIntent } from "../dialog/DialogIntent";
-import { AudioPlayerIntents, AudioBuiltinIntents } from "./BuiltinUtterances";
+import { AudioBuiltinIntents } from "./BuiltinUtterances";
 import { IntentSchema } from "./IntentSchema";
-import { SampleUtterancesBuilder } from "./SampleUtterancesBuilder";
 import { SlotPrompt } from "./SlotPrompt";
 
 /**
@@ -64,7 +63,7 @@ export class InteractionModel {
         }
 
         const schema = new IntentSchema(schemaJSON);
-        const samples = SampleUtterancesBuilder.fromJSON(sampleJSON);
+        const samples = SampleUtterances.fromJSON(sampleJSON);
         const prompts = promptsElement?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
         const dialogIntents = dialogElement?.intents.map((dialogIntent: any) =>
             DialogIntent.fromJSON(interactionModel, dialogIntent)) ?? [];
@@ -97,24 +96,18 @@ export class InteractionModel {
 
         this.dialogIntents?.forEach(dialogIntent => dialogIntent.interactionModel = this);
 
-        const builtinValues: any = AudioBuiltinIntents;
-        const isAudioPlayerSupported = this.audioPlayerSupported(intentSchema);
-        // We add each phrase one-by-one
-        // It is possible the built-ins have additional samples defined
-        for (const key of Object.keys(builtinValues)) {
-            if (this.isSupportedIntent(isAudioPlayerSupported, key)) {
+        // Audio player must have pause and resume intents in the model
+        const isAudioPlayerSupported = intentSchema.hasIntent("AMAZON.PauseIntent")
+            && intentSchema.hasIntent("AMAZON.ResumeIntent");
+        // We add each phrase one-by-one. It is possible the built-ins have additional samples defined
+        for (const [key, phrases] of Object.entries(AudioBuiltinIntents)) {
+            if (intentSchema.hasIntent(key) || isAudioPlayerSupported) {
                 intentSchema.addIntent(key);
-                for (const phrase of builtinValues[key]) {
-                    this.sampleUtterances.addSample(key, phrase);
+                for (const phrase of phrases) {
+                    sampleUtterances.addSample(key, phrase);
                 }
             }
         }
-    }
-    
-    public isSupportedIntent(isAudioPlayerSupported: boolean, intent: string): boolean {
-        const hasIntent = this.intentSchema.hasIntent(intent);
-        const isAudioPlayerIntent = isAudioPlayerSupported && AudioPlayerIntents.indexOf(intent) >= 0;
-        return hasIntent || isAudioPlayerIntent;
     }
 
     public dialogIntent(intentName: string): DialogIntent | undefined {

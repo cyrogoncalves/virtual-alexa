@@ -6,7 +6,7 @@ import { RemoteSkillInteractor } from "../impl/RemoteSkillInteractor";
 import { SkillInteractor } from "../impl/SkillInteractor";
 import { IntentSchema } from "../model/IntentSchema";
 import { InteractionModel } from "../model/InteractionModel";
-import { SampleUtterancesBuilder } from "../model/SampleUtterancesBuilder";
+import { SampleUtterances } from "../virtualCore/SampleUtterances";
 import { SkillContext } from "./SkillContext";
 import { SessionEndedReason, SkillRequest } from "./SkillRequest";
 import { SkillResponse } from "./SkillResponse";
@@ -301,12 +301,12 @@ export class VirtualAlexaBuilder {
 
         } else if (this._intentSchema && this._sampleUtterances) {
             const schema = IntentSchema.fromJSON(this._intentSchema);
-            const utterances = SampleUtterancesBuilder.fromJSON(this._sampleUtterances);
+            const utterances = SampleUtterances.fromJSON(this._sampleUtterances);
             model = new InteractionModel(schema, utterances);
 
         } else if (this._intentSchemaFile && this._sampleUtterancesFile) {
             const schema = IntentSchema.fromFile(this._intentSchemaFile);
-            const utterances = SampleUtterancesBuilder.fromFile(this._sampleUtterancesFile);
+            const utterances = SampleUtterances.fromFile(this._sampleUtterancesFile);
             model = new InteractionModel(schema, utterances);
         } else {
             model = InteractionModel.fromLocale(this._locale);

@@ -9,7 +9,22 @@ export class Utterance {
   private slots: string[];
 
   public constructor(interactionModel: InteractionModel, phrase: string) {
-    this.matchIntent(interactionModel, phrase);
+    const matches = [];
+    for (const intent of interactionModel.intentSchema.intents()) {
+      for (const sample of interactionModel.sampleUtterances.samplesForIntent(intent.name)) {
+        const sampleTest = sample.matchesUtterance(phrase);
+        if (sampleTest.matches()) {
+          matches.push(sampleTest);
+        }
+      }
+    }
+
+    if (matches.length > 0) {
+      const topMatch = matches.reduce((top, match) => match.score() > top.score() ||
+      top.score() === match.score() && match.scoreSlots() > top.scoreSlots() ? match : top, matches[0]);
+      this.matchedSample = topMatch.samplePhrase;
+      this.slots = topMatch.slotValues();
+    }
   }
 
   public intent(): string {
@@ -30,32 +45,9 @@ export class Utterance {
   }
 
   public toJSON(): any {
-    const json: any = {};
-    if (this.slots) {
-      for (let i = 0; i < this.slots.length; i++) {
-        const slotName = this.matchedSample.slotName(i);
-        json[slotName] = this.slot(i);
-      }
-    }
-    return json;
-  }
-
-  private matchIntent(interactionModel: InteractionModel, phrase: string): void {
-    const matches = [];
-    for (const intent of interactionModel.intentSchema.intents()) {
-      for (const sample of interactionModel.sampleUtterances.samplesForIntent(intent.name)) {
-        const sampleTest = sample.matchesUtterance(phrase);
-        if (sampleTest.matches()) {
-          matches.push(sampleTest);
-        }
-      }
-    }
-
-    if (matches.length > 0) {
-      const topMatch = matches.reduce((top, match) => match.score() > top.score() ||
-          top.score() === match.score() && match.scoreSlots() > top.scoreSlots() ? match : top, matches[0]);
-      this.matchedSample = topMatch.samplePhrase;
-      this.slots = topMatch.slotValues();
-    }
+    return this.slots?.reduce((json: any, slot, i) => {
+      json[this.matchedSample.slotNames[i]] = slot.trim();
+      return json;
+    }, {}) ?? {};
   }
 }

@@ -1,20 +1,52 @@
 import { SlotMatch } from "./SlotTypes";
 import { InteractionModel } from '../model/InteractionModel';
+import * as fs from "fs";
 
 export class SampleUtterances {
+  public static fromFile(file: string): SampleUtterances {
+    const data = fs.readFileSync(file);
+    const lines = data.toString().split("\n");
+    const utterances = new SampleUtterances();
+    for (const line of lines) {
+      if (line.trim().length === 0) {
+        // We skip blank lines - which is what Alexa does
+        continue;
+      }
+
+      const index = line.indexOf(" ");
+      if (index === -1) {
+        throw Error("Invalid sample utterance: " + line);
+      }
+
+      const intent = line.substr(0, index);
+      const sample = line.substr(index).trim();
+      utterances.addSample(intent, sample);
+    }
+    return utterances;
+  }
+
+  public static fromJSON(sampleUtterancesJSON: any) {
+    const sampleUtterances = new SampleUtterances();
+    for (const intent of Object.keys(sampleUtterancesJSON)) {
+      for (const sample of sampleUtterancesJSON[intent]) {
+        sampleUtterances.addSample(intent, sample);
+      }
+    }
+    return sampleUtterances;
+  }
+
   public interactionModel: InteractionModel;
 
-  private samples: {[id: string]: SamplePhrase[]} = {};
+  private samples = new Map<string, SamplePhrase[]>();
 
   public addSample(intent: string, sample: string) {
-    if (!(intent in this.samples)) {
-      this.samples[intent] = [];
-    }
-    this.samples[intent].push(new SamplePhrase(this, intent, sample));
+    if (!this.samples.has(intent))
+      this.samples.set(intent, []);
+    this.samples.get(intent).push(new SamplePhrase(this, intent, sample));
   }
 
   public samplesForIntent(intent: string): SamplePhrase [] {
-    return this.samples[intent] || [];
+    return this.samples.get(intent) || [];
   }
 }
 
@@ -37,10 +69,6 @@ export class SamplePhrase {
 
   public slotName(index: number): string | undefined {
     return this._slotNames[index];
-  }
-
-  public slotCount(): number {
-    return this._slotNames.length;
   }
 
   public regex(): RegExp {
@@ -109,7 +137,7 @@ export class SamplePhraseTest {
 
   // We assign a score based on the number of non-slot value letters that match
   public score(): number {
-    const slotValueLength = this.slotValues().reduce((length, slotValue) => length + slotValue.length, 0);
+    const slotValueLength = this.slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);
     return this.matchString.length - slotValueLength;
   }
 
