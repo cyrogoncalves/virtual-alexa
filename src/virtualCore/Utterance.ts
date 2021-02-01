@@ -8,12 +8,12 @@ export class Utterance {
   public matchedSample: SamplePhrase;
   private slots: string[];
 
-  public constructor(public interactionModel: InteractionModel, public phrase: string) {
-    this.matchIntent();
+  public constructor(interactionModel: InteractionModel, phrase: string) {
+    this.matchIntent(interactionModel, phrase);
   }
 
   public intent(): string {
-    return this.matched() ? this.matchedSample.intent : undefined;
+    return this.matchedSample?.intent;
   }
 
   public matched(): boolean {
@@ -21,23 +21,12 @@ export class Utterance {
   }
 
   public slot(index: number): string | undefined {
-    if (!this.slots || index >= this.slots.length) {
-      return undefined;
-    }
-
-    return this.slots[index].trim();
+    return this.slots?.[index]?.trim();
   }
 
   public slotByName(name: string): string | undefined {
-    let slotValue;
-    for (let i = 0; i < this.matchedSample.slotCount(); i++) {
-      const slotName = this.matchedSample.slotName(i);
-      if (slotName.toLowerCase() === name.toLowerCase()) {
-        slotValue = this.slots[i].trim();
-        break;
-      }
-    }
-    return slotValue;
+    const index = this.matchedSample.slotNames.findIndex(slotName => slotName.toLowerCase() === name.toLowerCase());
+    return this.slots[index].trim();
   }
 
   public toJSON(): any {
@@ -51,11 +40,11 @@ export class Utterance {
     return json;
   }
 
-  private matchIntent(): void {
+  private matchIntent(interactionModel: InteractionModel, phrase: string): void {
     const matches = [];
-    for (const intent of this.interactionModel.intentSchema.intents()) {
-      for (const sample of this.interactionModel.sampleUtterances.samplesForIntent(intent.name)) {
-        const sampleTest = sample.matchesUtterance(this.phrase);
+    for (const intent of interactionModel.intentSchema.intents()) {
+      for (const sample of interactionModel.sampleUtterances.samplesForIntent(intent.name)) {
+        const sampleTest = sample.matchesUtterance(phrase);
         if (sampleTest.matches()) {
           matches.push(sampleTest);
         }
@@ -63,17 +52,8 @@ export class Utterance {
     }
 
     if (matches.length > 0) {
-      let topMatch;
-      for (const match of matches) {
-        if (!topMatch || match.score() > topMatch.score()) {
-          topMatch = match;
-        } else if (topMatch.score() === match.score()) {
-          // If the scores are the same, check to see which has more specific slots
-          if (match.scoreSlots() > topMatch.scoreSlots()) {
-            topMatch = match;
-          }
-        }
-      }
+      const topMatch = matches.reduce((top, match) => match.score() > top.score() ||
+          top.score() === match.score() && match.scoreSlots() > top.scoreSlots() ? match : top, matches[0]);
       this.matchedSample = topMatch.samplePhrase;
       this.slots = topMatch.slotValues();
     }

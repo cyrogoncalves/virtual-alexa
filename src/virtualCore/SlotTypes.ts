@@ -10,6 +10,17 @@ export class SlotMatch {
                      public slotValueSynonym?: string) {
     this.untyped = false;
   }
+
+  static fromType(slotValue: string, slotType2: SlotType) {
+    // If no slot type definition is provided, we just assume it is a match
+    if (!slotType2) {
+      const match = new SlotMatch(true, slotValue);
+      match.untyped = true;
+      return match;
+    } else {
+      return slotType2.match(slotValue);
+    }
+  }
 }
 
 export class SlotType {
@@ -54,11 +65,9 @@ export class SlotType {
       if (slotValue.name.value.toLowerCase() === value.toLowerCase()) {
         matches.push(new SlotMatch(true, value, slotValue));
       } else if (slotValue.name.synonyms) {
-        for (const synonym of slotValue.name.synonyms) {
-          if (synonym.toLowerCase() === value.toLowerCase()) {
-            matches.push(new SlotMatch(true, value, slotValue, synonym));
-          }
-        }
+        matches.push(...slotValue.name.synonyms
+            .filter(synonym => synonym.toLowerCase() === value.toLowerCase())
+            .map(synonym => new SlotMatch(true, value, slotValue, synonym)));
       }
     }
     return matches;
