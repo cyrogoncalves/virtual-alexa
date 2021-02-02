@@ -11,7 +11,7 @@ export class IntentSchema {
         return new IntentSchema(schemaJSON);
     }
 
-    public constructor(private schemaJSON: { intents: any }) {}
+    public constructor(private schemaJSON: { intents: any[] }) {}
 
     public intents(): Intent[] {
         return this.schemaJSON.intents.map((intentJSON: any) => ({ name: intentJSON.intent, slots: intentJSON.slots }));

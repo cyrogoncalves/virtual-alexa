@@ -33,17 +33,11 @@ export class InteractionModel {
     // Using this for reference:
     //  https://github.com/alexa/skill-sample-nodejs-team-lookup/blob/master/speech-assets/interaction-model.json
     public static fromJSON(interactionModel: any): InteractionModel {
-        let languageModel = interactionModel;
-        let promptsElement = interactionModel.prompts;
-        let dialogElement = interactionModel.dialog;
         // For the official interaction model that is part of SMAPI,
         //  we pull the data off of the interactionModel.languageModel element
-        if ("interactionModel" in interactionModel) {
-            languageModel = interactionModel.interactionModel.languageModel;
-            promptsElement = interactionModel.interactionModel.prompts;
-            dialogElement = interactionModel.interactionModel.dialog;
-        }
+        const model = interactionModel.interactionModel || interactionModel;
 
+        let languageModel = interactionModel.interactionModel?.languageModel || interactionModel;
         // There is another version of the model from the interaction model builder
         if ("languageModel" in interactionModel) {
             languageModel = interactionModel.languageModel;
@@ -64,8 +58,9 @@ export class InteractionModel {
 
         const schema = new IntentSchema(schemaJSON);
         const samples = SampleUtterances.fromJSON(sampleJSON);
-        const prompts = promptsElement?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
-        const dialogIntents = dialogElement?.intents.map((dialogIntent: any) => new DialogIntent(dialogIntent)) ?? [];
+        const prompts = model.prompts?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
+        // const dialogIntents = model.dialog as DialogIntent[] ?? [];
+        const dialogIntents =  model.dialog?.intents.map((dialogIntent: any) => dialogIntent as DialogIntent);
         return new InteractionModel(schema, samples, languageModel.types || [], prompts, dialogIntents);
     }
 
@@ -92,8 +87,6 @@ export class InteractionModel {
 
         // In bootstrapping the interaction model, we pass it to its children
         this.sampleUtterances.interactionModel = this;
-
-        this.dialogIntents?.forEach(dialogIntent => dialogIntent.interactionModel = this);
 
         // Audio player must have pause and resume intents in the model
         const isAudioPlayerSupported = intentSchema.hasIntent("AMAZON.PauseIntent")
