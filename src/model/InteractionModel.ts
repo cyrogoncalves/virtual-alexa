@@ -65,8 +65,7 @@ export class InteractionModel {
         const schema = new IntentSchema(schemaJSON);
         const samples = SampleUtterances.fromJSON(sampleJSON);
         const prompts = promptsElement?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
-        const dialogIntents = dialogElement?.intents.map((dialogIntent: any) =>
-            DialogIntent.fromJSON(interactionModel, dialogIntent)) ?? [];
+        const dialogIntents = dialogElement?.intents.map((dialogIntent: any) => new DialogIntent(dialogIntent)) ?? [];
         return new InteractionModel(schema, samples, languageModel.types || [], prompts, dialogIntents);
     }
 

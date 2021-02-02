@@ -307,7 +307,17 @@ export class SkillRequest {
         // We only include the entity resolution for builtin types if they have been extended
         //  and for all custom slot types
         if (slotType?.isCustom()) {
-            slotValueObject.setEntityResolution(this.context.applicationID(), slotType);
+            // slotValueObject.setEntityResolution(this.context.applicationID(), slotType);
+            const authority = `amzn1.er-authority.echo-sdk.${this.context.applicationID()}.${slotType.name}`;
+            const matches = slotType.matchAll(slotValueObject.value).filter(m => m.enumeratedValue && !m.enumeratedValue.builtin);
+            // If this is not a builtin value, we add the entity resolution
+            if (!matches.length) {
+                slotValueObject.addEntityResolution(authority);
+            } else {
+                // Possible to have multiple matches, where we have overlapping synonyms
+                matches.forEach(match => slotValueObject.addEntityResolution(authority,
+                    [{ value: { id: match.enumeratedValue.id, name: match.enumeratedValue.name.value } }]));
+            }
         }
         this.json.request.intent.slots[slotName] = slotValueObject;
 

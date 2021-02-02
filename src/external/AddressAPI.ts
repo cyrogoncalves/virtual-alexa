@@ -66,9 +66,7 @@ export class AddressAPI {
         // Does not work, for certain scenarios, if it is just a string
         const scope = nock(baseURL)
             .persist()
-            .get((path) => {
-                return path === ("/v1/devices/" + this.context.device.id + pathEnd);
-            })
+            .get(path => path === `/v1/devices/${this.context.device.id}${pathEnd}`)
             .query(true)
             .reply(responseCode, JSON.stringify(payload, null, 2));
         if (pathEnd.endsWith("countryAndPostalCode")) {
