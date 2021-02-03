@@ -1,5 +1,4 @@
-import { SkillContext } from './SkillContext';
-import { ConfirmationStatus, DialogState } from '../dialog/DialogManager';
+import { SkillContext, ConfirmationStatus, DialogState } from './SkillContext';
 import { AudioPlayerActivity } from '../audioPlayer/AudioPlayer';
 import * as _ from 'lodash';
 import { SlotValue } from '../model/InteractionModel';

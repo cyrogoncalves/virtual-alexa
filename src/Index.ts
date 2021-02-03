@@ -1,6 +1,5 @@
 export { AudioPlayer, AudioItem } from "./audioPlayer/AudioPlayer";
-export { DialogManager } from "./dialog/DialogManager";
-export { SkillContext, SkillSession, Device } from "./core/SkillContext";
+export { SkillContext, SkillSession, Device, DialogManager } from "./core/SkillContext";
 export { SkillResponse } from "./core/SkillResponse";
 export { RequestFilter, VirtualAlexa, VirtualAlexaBuilder } from "./core/VirtualAlexa";
 export { AddressAPI } from "./external/AddressAPI";

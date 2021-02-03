@@ -1,7 +1,7 @@
 import {assert} from "chai";
 import {SkillResponse} from "../src/core/SkillResponse";
 import {VirtualAlexa} from "../src/core/VirtualAlexa";
-import { ConfirmationStatus } from "../src/dialog/DialogManager";
+import { ConfirmationStatus } from '../src/core/SkillContext';
 
 process.on("unhandledRejection", (e: any) => {
     console.error(e);

@@ -2,7 +2,7 @@ import * as fs from "fs";
 import { BuiltinSlotTypes, SlotType } from "../virtualCore/SlotTypes";
 import { SampleUtterances } from "../virtualCore/SampleUtterances";
 import { AudioBuiltinIntents } from "../audioPlayer/AudioPlayer";
-import { ConfirmationStatus } from '../dialog/DialogManager';
+import { ConfirmationStatus } from '../core/SkillContext';
 
 /**
  * Parses and interprets an interaction model
