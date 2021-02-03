@@ -43,20 +43,16 @@ export class InteractionModel {
             languageModel = interactionModel.languageModel;
         }
 
-        const schemaJSON: any = {
-            intents: [],
-        };
         const sampleJSON: any = {};
         for (const intent of languageModel.intents) {
             // The name of the intent is on the property "name" instead of "intent" for the unified model
             intent.intent = intent.name;
-            schemaJSON.intents.push(intent);
             if (intent.samples) {
                 sampleJSON[intent.intent] = intent.samples;
             }
         }
 
-        const schema = new IntentSchema(schemaJSON);
+        const schema = new IntentSchema(languageModel.intents);
         const samples = SampleUtterances.fromJSON(sampleJSON);
         const prompts = model.prompts?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
         // const dialogIntents = model.dialog as DialogIntent[] ?? [];

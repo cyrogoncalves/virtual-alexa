@@ -54,26 +54,9 @@ export class SampleUtterances {
  * Helper class for handling phrases - breaks out the slots within a phrase
  */
 export class SamplePhrase {
-  private readonly _slotNames: string[] = [];
-  private readonly _regex: string;
+  public readonly slotNames: string[] = [];
 
-  public constructor(public sampleUtterances: SampleUtterances,
-                     public intent: string,
-                     public phrase: string) {
-    this._regex = this.phraseToRegex(this.phrase);
-  }
-
-  get slotNames() {
-    return this._slotNames;
-  }
-
-  public slotName(index: number): string | undefined {
-    return this._slotNames[index];
-  }
-
-  public regex(): RegExp {
-    return new RegExp("^" + this._regex + "$", "i");
-  }
+  public constructor(public sampleUtterances: SampleUtterances, public intent: string, public phrase: string) {}
 
   /**
    * Tests to see if the utterances matches the sample phrase
@@ -85,32 +68,6 @@ export class SamplePhrase {
   public matchesUtterance(utterance: string): SamplePhraseTest {
     return new SamplePhraseTest(this, utterance);
   }
-
-  /**
-   * Takes a phrase like "This is a {Slot}" and turns it into a regex like "This is a(.*)"
-   * This is so we can compare the sample utterances (which have names that tie off to the slot names defined in the
-   *  intent schema) with the actual utterance, which have values in the slot positions (as opposed to the names)
-   * @param phrase
-   */
-  private phraseToRegex(phrase: string): string {
-    const startIndex = phrase.indexOf("{");
-    if (startIndex !== -1) {
-      const slotName = phrase.substring(startIndex + 1, phrase.indexOf("}", startIndex));
-
-      // Literal are in the format "sample { <literal sample> | <slotname>}"
-      // e.g.: "I'm an {aquarius | literal}"
-      this._slotNames.push(slotName.indexOf("|") === -1 ? slotName
-          : slotName.substring(slotName.indexOf("|") + 2, slotName.length));
-
-      phrase = phrase.substring(0, startIndex).trim() + "(.*)" + phrase.substring(phrase.indexOf("}", startIndex) + 1).trim();
-      phrase = this.phraseToRegex(phrase);
-    }
-
-    // We make the regex lowercase, so that we match a phrase regardless of case
-    // We only switch to lowercase here because if we change the slotnames to lowercase,
-    //  it throws off the slot matching
-    return phrase;
-  }
 }
 
 export class SamplePhraseTest {
@@ -119,7 +76,7 @@ export class SamplePhraseTest {
 
   public constructor(public samplePhrase: SamplePhrase, private utterance: string) {
     const cleanUtterance = utterance.replace(/[!"¿?|#$%\/()=+\-_<>*{}·¡\[\].,;:]/g, "");
-    const matchArray = cleanUtterance.match(samplePhrase.regex());
+    const matchArray = cleanUtterance.match(new RegExp(`^${this.phraseToRegex(samplePhrase)}$`, "i"));
 
     // If we have a regex match, check all the slots match their types
     if (matchArray) {
@@ -149,6 +106,32 @@ export class SamplePhraseTest {
     return this.slotMatches.map(slotMatch => slotMatch.value);
   }
 
+  /**
+   * Takes a phrase like "This is a {Slot}" and turns it into a regex like "This is a(.*)"
+   * This is so we can compare the sample utterances (which have names that tie off to the slot names defined in the
+   *  intent schema) with the actual utterance, which have values in the slot positions (as opposed to the names)
+   * @param samplePhrase
+   */
+  private phraseToRegex(samplePhrase: SamplePhrase): string {
+    const startIndex = samplePhrase.phrase.indexOf("{");
+    if (startIndex !== -1) {
+      const slotName = samplePhrase.phrase.substring(startIndex + 1, samplePhrase.phrase.indexOf("}", startIndex));
+
+      // Literal are in the format "sample { <literal sample> | <slotname>}"
+      // e.g.: "I'm an {aquarius | literal}"
+      samplePhrase.slotNames.push(slotName.indexOf("|") === -1 ? slotName
+          : slotName.substring(slotName.indexOf("|") + 2, slotName.length));
+
+      samplePhrase.phrase = samplePhrase.phrase.substring(0, startIndex).trim() + "(.*)" + samplePhrase.phrase.substring(samplePhrase.phrase.indexOf("}", startIndex) + 1).trim();
+      samplePhrase.phrase = this.phraseToRegex(samplePhrase);
+    }
+
+    // We make the regex lowercase, so that we match a phrase regardless of case
+    // We only switch to lowercase here because if we change the slotnames to lowercase,
+    //  it throws off the slot matching
+    return samplePhrase.phrase;
+  }
+
   private checkSlots(input: string, slotValues: string []): SlotMatch[] | undefined {
     // Build an array of results - we want to pass back the exact value that matched (not change the case)
     const result = [];
@@ -163,7 +146,7 @@ export class SamplePhraseTest {
         return undefined;
       }
 
-      const slotName = this.samplePhrase.slotName(index);
+      const slotName = this.samplePhrase.slotNames[index];
       // Look up the slot type for the name
       const interactionModel = this.samplePhrase.sampleUtterances.interactionModel;
       const slotType = interactionModel.intentSchema.intent(this.samplePhrase.intent)

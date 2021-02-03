@@ -8,13 +8,13 @@ export class IntentSchema {
     }
 
     public static fromJSON(schemaJSON: any): IntentSchema {
-        return new IntentSchema(schemaJSON);
+        return new IntentSchema(schemaJSON.intents);
     }
 
-    public constructor(private schemaJSON: { intents: any[] }) {}
+    public constructor(private _intents: any[]) {}
 
     public intents(): Intent[] {
-        return this.schemaJSON.intents.map((intentJSON: any) => ({ name: intentJSON.intent, slots: intentJSON.slots }));
+        return this._intents.map((intentJSON: any) => ({ name: intentJSON.intent, slots: intentJSON.slots }));
     }
 
     public intent(intentString: string): Intent {
@@ -26,8 +26,8 @@ export class IntentSchema {
     }
 
     public addIntent(intent: string): void {
-        if (!this.schemaJSON.intents.some((item: any) => item.intent === intent)) {
-            this.schemaJSON.intents.push({intent});
+        if (!this._intents.some((item: any) => item.intent === intent)) {
+            this._intents.push({intent});
         }
     }
 }
