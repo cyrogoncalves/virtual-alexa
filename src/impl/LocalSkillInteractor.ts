@@ -21,12 +21,10 @@ export class LocalSkillInteractor extends SkillInteractor {
             };
 
             const context = new LambdaContext(callback);
-            const promise = handlerFunction(requestJSON, context, callback);
             // For Node8, lambdas can return a promise - if they do, we call the context object with results
-            if (promise) {
-                promise.then((result: any) => context.done(null, result))
-                    .catch((error: any) => context.done(error, null));
-            }
+            handlerFunction(requestJSON, context, callback)
+                ?.then((result: any) => resolve(result))
+                .catch((error: any) => reject(error));
         });
     }
 

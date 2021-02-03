@@ -4,7 +4,7 @@ import { DynamoDB } from "../external/DynamoDB";
 import { LocalSkillInteractor } from "../impl/LocalSkillInteractor";
 import { RemoteSkillInteractor } from "../impl/RemoteSkillInteractor";
 import { SkillInteractor } from "../impl/SkillInteractor";
-import { InteractionModel, IntentSchema } from "../model/InteractionModel";
+import { IntentSchema, InteractionModel } from "../model/InteractionModel";
 import { SampleUtterances } from "../virtualCore/SampleUtterances";
 import { SkillContext } from "./SkillContext";
 import { SessionEndedReason, SkillRequest } from "./SkillRequest";
@@ -157,23 +157,11 @@ export class VirtualAlexaBuilder {
     /** @internal */
     private _applicationID: string;
     /** @internal */
-    private _handler: string | ((...args: any[]) => void);
-    /** @internal */
-    private _intentSchema: any;
-    /** @internal */
-    private _intentSchemaFile: string;
-    /** @internal */
-    private _interactionModel: string;
-    /** @internal */
-    private _interactionModelFile: string;
-    /** @internal */
-    private _sampleUtterances: any;
-    /** @internal */
-    private _sampleUtterancesFile: string;
-    /** @internal */
-    private _skillURL: string;
-    /** @internal */
     private _locale: string = "en-US";
+    /** @internal */
+    private _model: InteractionModel;
+    /** @internal */
+    private _interactor: SkillInteractor;
 
     /**
      * The application ID of the skill [Optional]
@@ -186,47 +174,12 @@ export class VirtualAlexaBuilder {
     }
 
     /**
-     * The name of the handler, or the handler function itself, for a Lambda to be called<br>
-     * The name should be in the format "index.handler" where:<br>
-     * `index` is the name of the file - such as index.js<br>
-     * `handler` is the name of the exported function to call on the file<br>
-     * @param {string | Function} handlerName
-     * @returns {VirtualAlexaBuilder}
-     */
-    public handler(handlerName: string | ((...args: any[]) => void)): VirtualAlexaBuilder {
-        this._handler = handlerName;
-        return this;
-    }
-
-    /**
-     * JSON that corresponds to the intent schema<br>
-     * If the intent schema is provided, a {@link VirtualAlexaBuilder.sampleUtterances} JSON must also be supplied
-     * @param json
-     * @returns {VirtualAlexaBuilder}
-     */
-    public intentSchema(json: any): VirtualAlexaBuilder {
-        this._intentSchema = json;
-        return this;
-    }
-
-    /**
-     * Path to intent schema file<br>
-     * To be provided along with {@link VirtualAlexaBuilder.sampleUtterancesFile}<br>
-     * @param {string} filePath
-     * @returns {VirtualAlexaBuilder}
-     */
-    public intentSchemaFile(filePath: any): VirtualAlexaBuilder {
-        this._intentSchemaFile = filePath;
-        return this;
-    }
-
-    /**
      * JSON that corresponds to the new, unified interaction model
      * @param json
      * @returns {VirtualAlexaBuilder}
      */
     public interactionModel(json: any): VirtualAlexaBuilder {
-        this._interactionModel = json;
+        this._model = InteractionModel.fromJSON(json);
         return this;
     }
 
@@ -236,13 +189,12 @@ export class VirtualAlexaBuilder {
      * @returns {VirtualAlexaBuilder}
      */
     public interactionModelFile(filePath: string): VirtualAlexaBuilder {
-        this._interactionModelFile = filePath;
+        this._model = InteractionModel.fromFile(filePath);
         return this;
     }
 
     /**
-     * JSON that corresponds to the sample utterances<br>
-     * Provided along with {@link VirtualAlexaBuilder.intentSchema}<br>
+     * A schema JSON with it's samples.
      * The sample utterances should be in the form:
      * ```javascript
      * {
@@ -250,23 +202,38 @@ export class VirtualAlexaBuilder {
      *      "IntentTwo": ["AnotherSample"]
      * }
      * ```
+     * @param schema JSON that corresponds to the intent schema
      * @param utterances The sample utterances in JSON format
      * @returns {VirtualAlexaBuilder}
      */
-    public sampleUtterances(utterances: any): VirtualAlexaBuilder {
-        this._sampleUtterances = utterances;
+    public intentSchema(schema: any, utterances: any): VirtualAlexaBuilder {
+        this._model = new InteractionModel(IntentSchema.fromJSON(schema), SampleUtterances.fromJSON(utterances));
         return this;
     }
 
     /**
-     * File path to sample utterances file<br>
-     * To be provided along with {@link VirtualAlexaBuilder.intentSchemaFile}<br>
-     * Format is the same as in the Alexa Developer Console - a simple text file of intents and utterances
-     * @param {string} filePath
+     * Format is the same as in the Alexa Developer Console - a simple text file of intents and utterances<br>
+     * @param {string} intentSchemaFilePath Path to intent schema file
+     * @param {string} sampleUtterancesFilePath File path to sample utterances file
      * @returns {VirtualAlexaBuilder}
      */
-    public sampleUtterancesFile(filePath: string): VirtualAlexaBuilder {
-        this._sampleUtterancesFile = filePath;
+    public intentSchemaFile(intentSchemaFilePath: string, sampleUtterancesFilePath: string): VirtualAlexaBuilder {
+        const schema = IntentSchema.fromFile(intentSchemaFilePath);
+        const utterances = SampleUtterances.fromFile(sampleUtterancesFilePath);
+        this._model = new InteractionModel(schema, utterances);
+        return this;
+    }
+
+    /**
+     * The name of the handler, or the handler function itself, for a Lambda to be called<br>
+     * The name should be in the format "index.handler" where:<br>
+     * `index` is the name of the file - such as index.js<br>
+     * `handler` is the name of the exported function to call on the file<br>
+     * @param {string | Function} handlerName
+     * @returns {VirtualAlexaBuilder}
+     */
+    public handler(handlerName: string | ((...args: any[]) => void)): VirtualAlexaBuilder {
+        this._interactor = new LocalSkillInteractor(handlerName);
         return this;
     }
 
@@ -276,7 +243,7 @@ export class VirtualAlexaBuilder {
      * @returns {VirtualAlexaBuilder}
      */
     public skillURL(url: string): VirtualAlexaBuilder {
-        this._skillURL = url;
+        this._interactor = new RemoteSkillInteractor(url);
         return this;
     }
 
@@ -291,41 +258,18 @@ export class VirtualAlexaBuilder {
     }
 
     public create(): VirtualAlexa {
-        let model;
-        if (this._interactionModel) {
-            model = InteractionModel.fromJSON(this._interactionModel);
-
-        } else if (this._interactionModelFile) {
-            model = InteractionModel.fromFile(this._interactionModelFile);
-
-        } else if (this._intentSchema && this._sampleUtterances) {
-            const schema = IntentSchema.fromJSON(this._intentSchema);
-            const utterances = SampleUtterances.fromJSON(this._sampleUtterances);
-            model = new InteractionModel(schema, utterances);
-
-        } else if (this._intentSchemaFile && this._sampleUtterancesFile) {
-            const schema = IntentSchema.fromFile(this._intentSchemaFile);
-            const utterances = SampleUtterances.fromFile(this._sampleUtterancesFile);
-            model = new InteractionModel(schema, utterances);
-        } else {
-            model = InteractionModel.fromLocale(this._locale);
-            if (!model) {
-                throw new Error(
-                    "Either an interaction model or intent schema and sample utterances must be provided.\n" +
-                    "Alternatively, if you specify a locale, Virtual Alexa will automatically check for the " +
-                    "interaction model under the directory \"./models\" - e.g., \"./models/en-US.json\"");
-            }
+        let model = this._model || InteractionModel.fromLocale(this._locale);
+        if (!model) {
+            throw new Error(
+                "Either an interaction model or intent schema and sample utterances must be provided.\n" +
+                "Alternatively, if you specify a locale, Virtual Alexa will automatically check for the " +
+                "interaction model under the directory \"./models\" - e.g., \"./models/en-US.json\"");
         }
 
-        let interactor;
-        if (this._handler) {
-            interactor = new LocalSkillInteractor(this._handler);
-        } else if (this._skillURL) {
-            interactor = new RemoteSkillInteractor(this._skillURL);
-        } else {
+        if (!this._interactor) {
             throw new Error("Either a handler or skillURL must be provided.");
         }
 
-        return new VirtualAlexa(interactor, model, this._locale, this._applicationID);
+        return new VirtualAlexa(this._interactor, model, this._locale, this._applicationID);
     }
 }

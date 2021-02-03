@@ -18,8 +18,8 @@ describe("Test User API mocks", function() {
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
-            .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
-            .intentSchemaFile("./test/resources/IntentSchema.json")
+            .intentSchemaFile("./test/resources/IntentSchema.json",
+                "./test/resources/SampleUtterances.txt")
             .create();
 
         virtualAlexa.userAPI.returnsUserProfile({
@@ -45,8 +45,8 @@ describe("Test User API mocks", function() {
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
-            .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
-            .intentSchemaFile("./test/resources/IntentSchema.json")
+            .intentSchemaFile("./test/resources/IntentSchema.json",
+                "./test/resources/SampleUtterances.txt")
             .create();
 
         virtualAlexa.userAPI.returnsUserProfile({

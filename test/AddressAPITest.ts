@@ -31,8 +31,8 @@ describe("Test address API mocks", function() {
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
-            .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
-            .intentSchemaFile("./test/resources/IntentSchema.json")
+            .intentSchemaFile("./test/resources/IntentSchema.json",
+                "./test/resources/SampleUtterances.txt")
             .create();
 
         virtualAlexa.addressAPI.returnsFullAddress({
@@ -74,8 +74,8 @@ describe("Test address API mocks", function() {
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
-            .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
-            .intentSchemaFile("./test/resources/IntentSchema.json")
+            .intentSchemaFile("./test/resources/IntentSchema.json",
+                "./test/resources/SampleUtterances.txt")
             .create();
 
         virtualAlexa.addressAPI.returnsCountryAndPostalCode({
@@ -104,8 +104,8 @@ describe("Test address API mocks", function() {
 
         let virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
-            .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
-            .intentSchemaFile("./test/resources/IntentSchema.json")
+            .intentSchemaFile("./test/resources/IntentSchema.json",
+                "./test/resources/SampleUtterances.txt")
             .create();
 
         virtualAlexa.addressAPI.returnsCountryAndPostalCode({
@@ -117,8 +117,8 @@ describe("Test address API mocks", function() {
 
         virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
-            .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
-            .intentSchemaFile("./test/resources/IntentSchema.json")
+            .intentSchemaFile("./test/resources/IntentSchema.json",
+                "./test/resources/SampleUtterances.txt")
             .create();
 
         virtualAlexa.addressAPI.returnsCountryAndPostalCode({
@@ -142,8 +142,8 @@ describe("Test address API mocks", function() {
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
-            .sampleUtterancesFile("./test/resources/SampleUtterances.txt")
-            .intentSchemaFile("./test/resources/IntentSchema.json")
+            .intentSchemaFile("./test/resources/IntentSchema.json",
+                "./test/resources/SampleUtterances.txt")
             .create();
 
         virtualAlexa.addressAPI.insufficientPermissions();
