@@ -49,14 +49,6 @@ export class LocalSkillInteractor extends SkillInteractor {
 }
 
 class LambdaContext {
-    public awsRequestId = "N/A";
-    public callbackWaitsForEmptyEventLoop = true;
-    public functionName = "BST.LambdaServer";
-    public functionVersion = "N/A";
-    public memoryLimitInMB = -1;
-    public invokedFunctionArn = "N/A";
-    public logGroupName = "N/A";
-    public logStreamName: string = null;
     public identity: any = null;
     public clientContext: any = null;
 

@@ -2,7 +2,7 @@ import { SkillContext } from './SkillContext';
 import { ConfirmationStatus, DialogState } from '../dialog/DialogManager';
 import { AudioPlayerActivity } from '../audioPlayer/AudioPlayer';
 import * as _ from 'lodash';
-import { SlotValue } from '../impl/SlotValue';
+import { SlotValue } from '../model/InteractionModel';
 import { SkillResponse } from './SkillResponse';
 import * as uuid from 'uuid';
 import { RequestFilter } from './VirtualAlexa';

@@ -1,5 +1,4 @@
-export { AudioItem } from "./audioPlayer/AudioItem";
-export { AudioPlayer } from "./audioPlayer/AudioPlayer";
+export { AudioPlayer, AudioItem } from "./audioPlayer/AudioPlayer";
 export { DialogManager } from "./dialog/DialogManager";
 export { SkillContext, SkillSession, Device } from "./core/SkillContext";
 export { SkillResponse } from "./core/SkillResponse";

@@ -1,8 +1,7 @@
 import { Utterance } from '../src/virtualCore/Utterance';
 import { SlotType } from '../src/virtualCore/SlotTypes';
 import {assert} from "chai";
-import {IntentSchema} from "../src/model/IntentSchema";
-import {InteractionModel} from "../src/model/InteractionModel";
+import {InteractionModel, IntentSchema} from "../src/model/InteractionModel";
 import { SampleUtterances } from '../src/virtualCore/SampleUtterances';
 
 describe("UtteranceTest", function() {

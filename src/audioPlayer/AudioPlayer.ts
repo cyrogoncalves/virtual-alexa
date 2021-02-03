@@ -1,5 +1,4 @@
 import { RequestType, SessionEndedReason } from "../core/SkillRequest";
-import { AudioItem } from "./AudioItem";
 import { VirtualAlexa } from "../core/VirtualAlexa";
 
 export enum AudioPlayerActivity {
@@ -10,6 +9,33 @@ export enum AudioPlayerActivity {
     PAUSED,
     STOPPED,
 }
+
+export const AudioBuiltinIntents = {
+    "AMAZON.CancelIntent": ["cancel", "never mind"],
+    "AMAZON.HelpIntent": ["help", "help me"],
+    "AMAZON.LoopOffIntent": ["loop off"],
+    "AMAZON.LoopOnIntent": ["loop", "loop on", "keep repeating this song"],
+    "AMAZON.MoreIntent": ["more"],
+    "AMAZON.NavigateHomeIntent": ["home", "go home"],
+    "AMAZON.NavigateSettingsIntent": ["settings"],
+    "AMAZON.NextIntent": ["next", "skip", "skip forward"],
+    "AMAZON.NoIntent": ["no", "no thanks"],
+    "AMAZON.PageDownIntent": ["page down"],
+    "AMAZON.PageUpIntent": ["page up"],
+    "AMAZON.PauseIntent": ["pause", "pause that"],
+    "AMAZON.PreviousIntent": ["go back", "previous", "skip back", "back up"],
+    "AMAZON.RepeatIntent": ["repeat", "say that again", "repeat that"],
+    "AMAZON.ResumeIntent": ["resume", "continue", "keep going"],
+    "AMAZON.ScrollDownIntent": ["scroll down"],
+    "AMAZON.ScrollLeftIntent": ["scroll left"],
+    "AMAZON.ScrollRightIntent": ["scroll right"],
+    "AMAZON.ScrollUpIntent": ["scroll up"],
+    "AMAZON.ShuffleOffIntent": ["shuffle off", "stop shuffling", "turn off shuffle"],
+    "AMAZON.ShuffleOnIntent": ["shuffle", "shuffle on", "shuffle the music", "shuffle mode"],
+    "AMAZON.StartOverIntent": ["start over", "restart", "start again"],
+    "AMAZON.StopIntent": ["stop", "off", "shut up"],
+    "AMAZON.YesIntent": ["yes", "yes please", "sure"],
+};
 
 /**
  * Emulates the behavior of the audio player
@@ -196,4 +222,35 @@ export class AudioPlayer {
             return this.playbackStarted();
         }
     }
+}
+
+/**
+ * Information about an AudioItem.
+ *
+ * Directly ties off to the JSON payload from Alexa.
+ */
+export class AudioItem {
+    public stream: AudioItemStream;
+
+    public constructor(private _json: any) {
+        this.stream = new AudioItemStream();
+        this.stream.url = _json.stream.url;
+        this.stream.token = _json.stream.token;
+        this.stream.expectedPreviousToken = _json.stream.expectedPreviousToken;
+        this.stream.offsetInMilliseconds = _json.stream.offsetInMilliseconds;
+    }
+
+    /**
+     * Clone function to prevent changes being made to internal state
+     */
+    public clone(): AudioItem {
+        return new AudioItem(this);
+    }
+}
+
+export class AudioItemStream {
+    public url: string = null;
+    public token: string = null;
+    public expectedPreviousToken: string = null;
+    public offsetInMilliseconds: number;
 }

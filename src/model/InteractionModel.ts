@@ -1,10 +1,8 @@
 import * as fs from "fs";
-import { BuiltinSlotTypes, SlotType } from '../virtualCore/SlotTypes';
-import { SampleUtterances } from '../virtualCore/SampleUtterances';
-import { DialogIntent } from "../dialog/DialogIntent";
-import { AudioBuiltinIntents } from "./BuiltinUtterances";
-import { IntentSchema } from "./IntentSchema";
-import { SlotPrompt } from "./SlotPrompt";
+import { BuiltinSlotTypes, SlotType } from "../virtualCore/SlotTypes";
+import { SampleUtterances } from "../virtualCore/SampleUtterances";
+import { AudioBuiltinIntents } from "../audioPlayer/AudioPlayer";
+import { ConfirmationStatus } from '../dialog/DialogManager';
 
 /**
  * Parses and interprets an interaction model
@@ -55,7 +53,6 @@ export class InteractionModel {
         const schema = new IntentSchema(languageModel.intents);
         const samples = SampleUtterances.fromJSON(sampleJSON);
         const prompts = model.prompts?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
-        // const dialogIntents = model.dialog as DialogIntent[] ?? [];
         const dialogIntents =  model.dialog?.intents.map((dialogIntent: any) => dialogIntent as DialogIntent);
         return new InteractionModel(schema, samples, languageModel.types || [], prompts, dialogIntents);
     }
@@ -110,4 +107,128 @@ export class InteractionModel {
         // Audio player must have pause and resume intents in the model
         return intentSchema.hasIntent("AMAZON.PauseIntent") && intentSchema.hasIntent("AMAZON.ResumeIntent");
     }
+}
+
+export class IntentSchema {
+    public static fromFile(file: string): IntentSchema {
+        const data = fs.readFileSync(file);
+        const json = JSON.parse(data.toString());
+        return IntentSchema.fromJSON(json);
+    }
+
+    public static fromJSON(schemaJSON: any): IntentSchema {
+        return new IntentSchema(schemaJSON.intents);
+    }
+
+    public constructor(private _intents: any[]) {}
+
+    public intents(): Intent[] {
+        return this._intents.map((intentJSON: any) => ({ name: intentJSON.intent, slots: intentJSON.slots }));
+    }
+
+    public intent(intentString: string): Intent {
+        return this.intents().find(o => o.name === intentString);
+    }
+
+    public hasIntent(intentString: string): boolean {
+        return !!this.intent(intentString);
+    }
+
+    public addIntent(intent: string): void {
+        if (!this._intents.some((item: any) => item.intent === intent)) {
+            this._intents.push({intent});
+        }
+    }
+}
+
+class SlotPrompt {
+    public static fromJSON(json: any): SlotPrompt {
+        const prompt = new SlotPrompt();
+        Object.assign(prompt, json);
+        return prompt;
+    }
+
+    public id: string;
+    public variations: SlotVariation[];
+
+    public variation(slots: {[id: string]: SlotValue}) {
+        let value = this.variations[0].value;
+        // Replace slot values in the variation, if they exist
+        // They will look like this "Are you sure you want {size} dog?"
+        for (const slot of Object.keys(slots)) {
+            const slotValue = slots[slot];
+            value = value.split("{" + slot + "}").join(slotValue.value);
+        }
+        return value;
+    }
+}
+
+export class SlotVariation {
+    public type: string;
+    public value: string;
+}
+
+export class SlotValue {
+    public resolutionsPerAuthority: {
+        values: EntityResolutionValue[];
+        status: {
+            code: EntityResolutionStatus
+        };
+        authority: string;
+    }[];
+
+    public constructor(
+        public name: string,
+        public value: string,
+        public confirmationStatus = ConfirmationStatus.NONE
+    ) {}
+
+    public addEntityResolution(authority: string, values: EntityResolutionValue[] = []) {
+        if (!this.resolutionsPerAuthority)
+            this.resolutionsPerAuthority = [];
+
+        const existingResolution = this.resolutionsPerAuthority.find(resolution => resolution.authority === authority);
+        if (existingResolution) {
+            existingResolution.values.push(values[0]);
+        } else {
+            const code = values?.length ? EntityResolutionStatus.ER_SUCCESS_MATCH : EntityResolutionStatus.ER_SUCCESS_NO_MATCH
+            this.resolutionsPerAuthority.push({ authority, values, status: { code } });
+        }
+    }
+}
+
+interface EntityResolutionValue {
+    value: {
+        id: string,
+        name: string
+    }
+}
+
+enum EntityResolutionStatus {
+    ER_SUCCESS_MATCH = "ER_SUCCESS_MATCH",
+    ER_SUCCESS_NO_MATCH = "ER_SUCCESS_NO_MATCH",
+    // ER_ERROR_TIMEOUT = "ER_ERROR_TIMEOUT",
+    // ER_ERROR_EXCEPTION = "ER_ERROR_EXCEPTION",
+}
+
+interface DialogIntent {
+    name: string;
+    confirmationRequired: boolean;
+    prompts: any;
+    slots: DialogSlot[];
+}
+
+type DialogSlot = {
+    name: string;
+    type: string;
+    confirmationRequired: boolean;
+    prompts: { [id: string]: string };
+}
+
+interface Intent {
+    name: string,
+    slots: {
+        name: string,
+        type: string
+    }[]
 }
