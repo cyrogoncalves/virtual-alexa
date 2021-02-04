@@ -109,31 +109,26 @@ describe("UtteranceTest", function() {
 
         it("Matches a simple phrase", () => {
             const utterance = new Utterance(model, "play");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "Play");
         });
 
         it("Matches a simple phrase, ignores case", () => {
             const utterance = new Utterance(model, "Play");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "Play");
         });
 
         it("Matches a simple phrase, ignores special characters", () => {
             const utterance = new Utterance(model, "play?");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "Play");
         });
 
         it("Matches help", () => {
             const utterance = new Utterance(model, "help");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "AMAZON.HelpIntent");
         });
 
         it("Matches a slotted phrase", () => {
             const utterance = new Utterance(model, "slot value");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "SlottedIntent");
             assert.equal(utterance.slot(0), "value");
             assert.equal(utterance.slotByName("SlotName"), "value");
@@ -141,13 +136,11 @@ describe("UtteranceTest", function() {
 
         it("Matches a slotted phrase, no slot value", () => {
             const utterance = new Utterance(model, "slot");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "SlottedIntent");
         });
 
         it("Matches a phrase with multiple slots", () => {
             const utterance = new Utterance(model, "multiple a and b");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "MultipleSlots");
             assert.equal(utterance.slot(0), "a");
             assert.equal(utterance.slot(1), "b");
@@ -157,7 +150,6 @@ describe("UtteranceTest", function() {
 
         it("Matches a phrase with multiple slots reversed", () => {
             const utterance = new Utterance(model, "reversed a then b");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "MultipleSlots");
             assert.equal(utterance.slot(0), "a");
             assert.equal(utterance.slot(1), "b");
@@ -167,7 +159,6 @@ describe("UtteranceTest", function() {
 
         it("Matches a phrase with slot with enumerated values", () => {
             const utterance = new Utterance(model, "US");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "CustomSlot");
             assert.equal(utterance.slot(0), "US");
             assert.equal(utterance.slotByName("country"), "US");
@@ -175,13 +166,11 @@ describe("UtteranceTest", function() {
 
         it("Does not match a phrase with slot with enumerated values", () => {
             const utterance = new Utterance(model, "hi");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "Hello");
         });
 
         it("Matches a phrase with slot with number value", () => {
             const utterance = new Utterance(model, "19801");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "NumberSlot");
             assert.equal(utterance.slot(0), "19801");
             assert.equal(utterance.slotByName("number"), "19801");
@@ -189,7 +178,6 @@ describe("UtteranceTest", function() {
 
         it("Matches a phrase with slot with long-form number value", () => {
             let utterance = new Utterance(model, "one");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "NumberSlot");
             assert.equal(utterance.slot(0), "one");
             assert.equal(utterance.slotByName("number"), "one");
@@ -208,26 +196,22 @@ describe("UtteranceTest", function() {
 
         it("Matches a more specific phrase", () => {
             const utterance = new Utterance(model, "1900 test");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "NumberSlot");
         });
 
         it("Matches with symbols in the phrase", () => {
             const utterance = new Utterance(model, "good? #%.morning");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "Hello");
         });
 
         it("Matches with punctuation in the phrase", () => {
             const utterance = new Utterance(model, "good, -morning:");
-            assert.isTrue(utterance.matched());
             assert.equal(utterance.intent(), "Hello");
         });
 
         describe("Matches for International Languages", function() {
             it("Matches a slotted phrase", () => {
                 const utterance = new Utterance(japaneseModel, "5 人のプレーヤー");
-                assert.isTrue(utterance.matched());
                 assert.equal(utterance.intent(), "GetIntentWithSlot");
                 assert.equal(utterance.slot(0), "5");
                 assert.equal(utterance.slotByName("number"), "5");
@@ -235,7 +219,6 @@ describe("UtteranceTest", function() {
 
             it("Matches a slotted phrase, no slot value", () => {
                 const utterance = new Utterance(japaneseModel, "おはよう");
-                assert.isTrue(utterance.matched());
                 assert.equal(utterance.intent(), "GetIntent");
             });
         });
