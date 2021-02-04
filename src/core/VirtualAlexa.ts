@@ -10,7 +10,6 @@ import { SkillContext } from "./SkillContext";
 import { SessionEndedReason, SkillRequest } from "./SkillRequest";
 import { SkillResponse } from "./SkillResponse";
 import { UserAPI } from "../external/UserAPI";
-import { Utterance } from '../virtualCore/Utterance';
 
 
 export class VirtualAlexa {
@@ -18,8 +17,6 @@ export class VirtualAlexa {
         return new VirtualAlexaBuilder();
     }
 
-    /** @internal */
-    private readonly _interactor: SkillInteractor;
     private requestFilter: RequestFilter;
     public readonly addressAPI: AddressAPI;
     public readonly userAPI: UserAPI;
@@ -27,10 +24,15 @@ export class VirtualAlexa {
     public readonly dynamoDB: DynamoDB;
     
     /** @internal */
-    public constructor(interactor: SkillInteractor, model: InteractionModel, locale: string, applicationID?: string) {
+    public constructor(
+        /** @internal */
+        private readonly _interactor: SkillInteractor,
+        model: InteractionModel,
+        locale: string,
+        applicationID?: string
+    ) {
         const audioPlayer = new AudioPlayer(this);
         this.context = new SkillContext(model, audioPlayer, locale, applicationID);
-        this._interactor = interactor;
         this.addressAPI = new AddressAPI(this.context);
         this.userAPI = new UserAPI(this.context);
         this.dynamoDB = new DynamoDB();
@@ -116,10 +118,14 @@ export class VirtualAlexa {
             resolvedUtterance = result[1];
         }
 
-        const utterance = new Utterance(this.context.interactionModel, resolvedUtterance);
+        const { matchedSample, slots } = this.context.interactionModel.utterance(resolvedUtterance);
+        const json = slots?.reduce((json: any, slot, i) => {
+            json[matchedSample.slotNames[i]] = slot.trim();
+            return json;
+        }, {}) ?? {};
         return this.request()
-            .intent(utterance.intent())
-            .slots(utterance.toJSON())
+            .intent(matchedSample?.intent)
+            .slots(json)
             .send();
     }
 }
