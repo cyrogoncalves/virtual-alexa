@@ -1,4 +1,4 @@
-import { SkillContext, ConfirmationStatus, DialogState } from './SkillContext';
+import { ConfirmationStatus, DialogState, SkillContext } from './SkillContext';
 import { AudioPlayerActivity } from '../audioPlayer/AudioPlayer';
 import * as _ from 'lodash';
 import { SlotValue } from '../model/InteractionModel';
@@ -45,7 +45,7 @@ export class SkillRequest {
         private requestFilter: RequestFilter
     ) {
         // First create the header part of the request
-        const baseRequest: any = {
+        this.json = {
             context: {
                 System: {
                     application: {
@@ -71,17 +71,15 @@ export class SkillRequest {
 
         // If the device ID is set, we set the API endpoint and deviceId properties
         if (context.device.id) {
-            baseRequest.context.System.apiAccessToken = context.apiAccessToken;
-            baseRequest.context.System.apiEndpoint = context.apiEndpoint;
-            baseRequest.context.System.device.deviceId = context.device.id;
+            this.json.context.System.apiAccessToken = context.apiAccessToken;
+            this.json.context.System.apiEndpoint = context.apiEndpoint;
+            this.json.context.System.device.deviceId = context.device.id;
         }
 
         // If display enabled, we add a display object to context
         if (context.device.displaySupported()) {
-            baseRequest.context.Display = {};
+            this.json.context.Display = {};
         }
-
-        this.json = baseRequest;
     }
 
     /**
@@ -377,12 +375,7 @@ export class SkillRequest {
      * Sets slot values as a dictionary of strings on the request
      */
     public slots(slots: {[id: string]: string}): SkillRequest {
-        if (slots) {
-            for (const slot of Object.keys(slots)) {
-                const slotValue = slots[slot];
-                this.slot(slot, slotValue);
-            }
-        }
+        slots && Object.entries(slots).forEach(([name, value]) => this.slot(name, value));
         return this;
     }
 

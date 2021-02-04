@@ -108,34 +108,19 @@ export class VirtualAlexa {
         }
 
         let resolvedUtterance = utteranceString;
-        const launchRequestOrUtter = VirtualAlexa.parseLaunchRequest(utteranceString);
-        if (launchRequestOrUtter === true) {
-            return this.launch();
-        } else if (launchRequestOrUtter) {
-            resolvedUtterance = launchRequestOrUtter;
+        if (/(ask|open|launch|talk to|tell).*/i.test(utteranceString)) {
+            const result = /^(?:ask|open|launch|talk to|tell) .* to (.*)/i.exec(utteranceString);
+            if (!result?.length) {
+                return this.launch();
+            }
+            resolvedUtterance = result[1];
         }
 
         const utterance = new Utterance(this.context.interactionModel, resolvedUtterance);
-        // If we don't match anything, we use the default utterance - simple algorithm for this
-        if (!utterance.matched()) {
-            throw new Error("Unable to match utterance: " + resolvedUtterance
-                + " to an intent. Try a different utterance, or explicitly set the intent");
-        }
-
         return this.request()
             .intent(utterance.intent())
             .slots(utterance.toJSON())
             .send();
-    }
-
-    private static parseLaunchRequest(utter: string): string | boolean {
-        const launchRequestRegex = /(ask|open|launch|talk to|tell).*/i;
-        if (launchRequestRegex.test(utter)) {
-            const launchAndUtterRegex = /^(?:ask|open|launch|talk to|tell) .* to (.*)/i;
-            const result = launchAndUtterRegex.exec(utter);
-            return result?.length ? result[1] : true;
-        }
-        return undefined;
     }
 }
 

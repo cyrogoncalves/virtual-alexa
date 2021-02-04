@@ -25,6 +25,12 @@ export class Utterance {
       this.matchedSample = topMatch.samplePhrase;
       this.slots = topMatch.slotValues();
     }
+
+    // If we don't match anything, we use the default utterance - simple algorithm for this
+    if (!this.matched()) {
+      throw new Error("Unable to match utterance: " + phrase
+          + " to an intent. Try a different utterance, or explicitly set the intent");
+    }
   }
 
   public intent(): string {

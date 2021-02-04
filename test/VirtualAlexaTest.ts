@@ -654,7 +654,6 @@ describe("VirtualAlexa Tests Using JSON", function() {
             try {
                 await virtualAlexa.intend("Play", {SlotName: "Value"});
             } catch (e) {
-                console.error(e);
                 assert.equal(e.message, "Trying to add slot to intent that does not have any slots defined");
             }
         });
