@@ -91,7 +91,7 @@ describe("UtteranceTest", function() {
         ],
     }] as SlotType[];
 
-    const model = new InteractionModel(IntentSchema.fromJSON(intentSchema),
+    const model = new InteractionModel(new IntentSchema(intentSchema.intents),
         SampleUtterances.fromJSON(sampleUtterances),
         slotTypes);
 

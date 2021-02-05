@@ -10,6 +10,7 @@ import { SkillContext } from "./SkillContext";
 import { SessionEndedReason, SkillRequest } from "./SkillRequest";
 import { SkillResponse } from "./SkillResponse";
 import { UserAPI } from "../external/UserAPI";
+import * as fs from "fs";
 
 
 export class VirtualAlexa {
@@ -198,7 +199,7 @@ export class VirtualAlexaBuilder {
      * @returns {VirtualAlexaBuilder}
      */
     public intentSchema(schema: any, utterances: any): VirtualAlexaBuilder {
-        this._model = new InteractionModel(IntentSchema.fromJSON(schema), SampleUtterances.fromJSON(utterances));
+        this._model = new InteractionModel(new IntentSchema(schema.intents), SampleUtterances.fromJSON(utterances));
         return this;
     }
 
@@ -209,7 +210,9 @@ export class VirtualAlexaBuilder {
      * @returns {VirtualAlexaBuilder}
      */
     public intentSchemaFile(intentSchemaFilePath: string, sampleUtterancesFilePath: string): VirtualAlexaBuilder {
-        const schema = IntentSchema.fromFile(intentSchemaFilePath);
+        const data = fs.readFileSync(intentSchemaFilePath);
+        const json = JSON.parse(data.toString());
+        const schema = new IntentSchema(json.intents);
         const utterances = SampleUtterances.fromFile(sampleUtterancesFilePath);
         this._model = new InteractionModel(schema, utterances);
         return this;

@@ -52,9 +52,7 @@ export class InteractionModel {
 
         const schema = new IntentSchema(languageModel.intents);
         const samples = SampleUtterances.fromJSON(sampleJSON);
-        const prompts = model.prompts?.map((prompt: any) => SlotPrompt.fromJSON(prompt)) ?? [];
-        const dialogIntents =  model.dialog?.intents.map((dialogIntent: any) => dialogIntent as DialogIntent);
-        return new InteractionModel(schema, samples, languageModel.types || [], prompts, dialogIntents);
+        return new InteractionModel(schema, samples, languageModel.types || [], model.prompts ?? [], model.dialog?.intents);
     }
 
     public static fromLocale(locale: string): InteractionModel {
@@ -78,13 +76,9 @@ export class InteractionModel {
             ...BuiltinSlotTypes.values()
         ];
 
-        // Audio player must have pause and resume intents in the model
-        const isAudioPlayerSupported = intentSchema.hasIntent("AMAZON.PauseIntent")
-            && intentSchema.hasIntent("AMAZON.ResumeIntent");
         // We add each phrase one-by-one. It is possible the built-ins have additional samples defined
         for (const [key, phrases] of Object.entries(AudioBuiltinIntents)) {
-            if (intentSchema.hasIntent(key) || isAudioPlayerSupported) {
-                intentSchema.addIntent(key);
+            if (intentSchema.hasIntent(key)) {
                 for (const phrase of phrases) {
                     sampleUtterances.addSample(key, phrase);
                 }
@@ -94,8 +88,8 @@ export class InteractionModel {
 
     public utterance(phrase: string) {
         const matches = [];
-        for (const intent of this.intentSchema.intents()) {
-            for (const sample of this.sampleUtterances.samplesForIntent(intent.name)) {
+        for (const intentName of this.intentSchema.intentNames()) {
+            for (const sample of this.sampleUtterances.samplesForIntent(intentName)) {
                 const sampleTest = this.matchesUtterance(sample, phrase);
                 if (sampleTest?.matches()) {
                     matches.push(sampleTest);
@@ -217,62 +211,32 @@ export class InteractionModel {
 }
 
 export class IntentSchema {
-    public static fromFile(file: string): IntentSchema {
-        const data = fs.readFileSync(file);
-        const json = JSON.parse(data.toString());
-        return IntentSchema.fromJSON(json);
-    }
-
-    public static fromJSON(schemaJSON: any): IntentSchema {
-        return new IntentSchema(schemaJSON.intents);
-    }
-
     public constructor(private _intents: any[]) {}
 
-    public intents(): Intent[] {
-        return this._intents.map((intentJSON: any) => ({ name: intentJSON.intent, slots: intentJSON.slots }));
+    public intentNames(): string[] {
+        return this._intents.map(intentJSON => intentJSON.intent);
+    }
+
+    public slots(intentString: string): any[] {
+        return this._intents.find(o => o.name === intentString)?.slots;
     }
 
     public intent(intentString: string): Intent {
-        return this.intents().find(o => o.name === intentString);
+        const intents = this._intents.map((intentJSON: any) => ({name: intentJSON.intent, slots: intentJSON.slots}));
+        return intents.find(o => o.name === intentString);
     }
 
     public hasIntent(intentString: string): boolean {
-        return !!this.intent(intentString);
-    }
-
-    public addIntent(intent: string): void {
-        if (!this._intents.some((item: any) => item.intent === intent)) {
-            this._intents.push({intent});
-        }
+        return this._intents.some(o => o.intent === intentString);
     }
 }
 
-class SlotPrompt {
-    public static fromJSON(json: any): SlotPrompt {
-        const prompt = new SlotPrompt();
-        Object.assign(prompt, json);
-        return prompt;
-    }
-
-    public id: string;
-    public variations: SlotVariation[];
-
-    public variation(slots: {[id: string]: SlotValue}) {
-        let value = this.variations[0].value;
-        // Replace slot values in the variation, if they exist
-        // They will look like this "Are you sure you want {size} dog?"
-        for (const slot of Object.keys(slots)) {
-            const slotValue = slots[slot];
-            value = value.split("{" + slot + "}").join(slotValue.value);
-        }
-        return value;
-    }
-}
-
-export class SlotVariation {
-    public type: string;
-    public value: string;
+interface SlotPrompt {
+    id: string;
+    variations: {
+        type: string;
+        value: string;
+    }[];
 }
 
 export class SlotValue {

@@ -24,22 +24,23 @@ export class SampleUtterances {
     return utterances;
   }
 
-  public static fromJSON(sampleUtterancesJSON: any) {
-    const sampleUtterances = new SampleUtterances();
-    for (const intent of Object.keys(sampleUtterancesJSON)) {
-      for (const sample of sampleUtterancesJSON[intent]) {
-        sampleUtterances.addSample(intent, sample);
-      }
-    }
-    return sampleUtterances;
+  public static fromJSON(json: any) {
+    return new SampleUtterances(Object.entries<any[]>(json).reduce(
+        (map, [intent, samples]) => map.set(intent, samples.map(s => new SamplePhrase(intent, s))),
+        new Map<string, SamplePhrase[]>()
+    ));
   }
 
-  private samples = new Map<string, SamplePhrase[]>();
+  constructor(private samples = new Map<string, SamplePhrase[]>()) {}
 
   public addSample(intent: string, sample: string) {
     if (!this.samples.has(intent))
       this.samples.set(intent, []);
-    this.samples.get(intent).push(new SamplePhrase(this, intent, sample));
+    this.samples.get(intent).push(new SamplePhrase(intent, sample));
+  }
+
+  public addSamples(intent: string, samples: string[]) {
+    this.samples.set(intent, samples.map(s => new SamplePhrase(intent, s)));
   }
 
   public samplesForIntent(intent: string): SamplePhrase [] {
@@ -53,7 +54,7 @@ export class SampleUtterances {
 export class SamplePhrase {
   public readonly slotNames: string[] = [];
 
-  public constructor(public sampleUtterances: SampleUtterances, public intent: string, public phrase: string) {}
+  public constructor(public intent: string, public phrase: string) {}
 }
 
 export class SamplePhraseTest {
