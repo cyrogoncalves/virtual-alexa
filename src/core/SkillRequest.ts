@@ -173,8 +173,8 @@ export class SkillRequest {
         };
 
         // Set default slot values - all slots must have a value for an intent
-        const intent = this.context.interactionModel.intentSchema.intent(intentName);
-        intent.slots?.forEach((intentSlot: any) =>
+        const slots = this.context.interactionModel.intentSchema.slots(intentName);
+        slots?.forEach((intentSlot: any) =>
             this.json.request.intent.slots[intentSlot.name] = {
                 name: intentSlot.name,
                 confirmationStatus: ConfirmationStatus.NONE
@@ -288,13 +288,13 @@ export class SkillRequest {
      * @param confirmationStatus
      */
     public slot(slotName: string, slotValue: string, confirmationStatus = ConfirmationStatus.NONE): SkillRequest {
-        const intent = this.context.interactionModel.intentSchema.intent(this.json.request.intent.name);
-        if (!intent.slots) {
+        const slots = this.context.interactionModel.intentSchema.slots(this.json.request.intent.name);
+        if (!slots) {
             throw new Error("Trying to add slot to intent that does not have any slots defined");
         }
 
         const slotValueObject = new SlotValue(slotName, slotValue, confirmationStatus);
-        const slot = intent.slots?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase()) || undefined;
+        const slot = slots?.find(s => slotName.toLowerCase() === s.name.toLowerCase()) || undefined;
         if (!slot) {
             throw new Error("Trying to add undefined slot to intent: " + slotName);
         }

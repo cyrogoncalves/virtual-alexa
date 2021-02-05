@@ -64,10 +64,6 @@ export class SamplePhraseTest {
       private matchString: string
   ) {}
 
-  public matches(): boolean {
-    return !!this.slotMatches;
-  }
-
   // We assign a score based on the number of non-slot value letters that match
   public score(): number {
     const slotValueLength = this.slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);

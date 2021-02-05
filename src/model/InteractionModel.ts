@@ -87,21 +87,7 @@ export class InteractionModel {
     }
 
     public utterance(phrase: string) {
-        const matches = [];
-        for (const intentName of this.intentSchema.intentNames()) {
-            for (const sample of this.sampleUtterances.samplesForIntent(intentName)) {
-                const sampleTest = this.matchesUtterance(sample, phrase);
-                if (sampleTest?.matches()) {
-                    matches.push(sampleTest);
-                }
-            }
-        }
-        // If we don't match anything, we use the default utterance - simple algorithm for this
-        if (!matches.length) {
-            throw new Error("Unable to match utterance: " + phrase
-                + " to an intent. Try a different utterance, or explicitly set the intent");
-        }
-
+        const matches = this.matchesUtterances(phrase);
         const topMatch = matches.reduce((top, match) => match.score() > top.score()
             || top.score() === match.score() && match.scoreSlots() > top.scoreSlots() ? match : top, matches[0]);
         return { matchedSample: topMatch.samplePhrase, slots: topMatch.slotValues() };
@@ -124,23 +110,33 @@ export class InteractionModel {
      * Tests to see if the utterances matches the sample phrase
      * If it does, returns an array of matching slot values
      * If it does not, returns undefined
-     * @param {SamplePhrase} samplePhrase
      * @param {string} utterance
      * @returns {SamplePhraseTest}
      */
-    private matchesUtterance(samplePhrase: SamplePhrase, utterance: string): SamplePhraseTest {
-        // return new SamplePhraseTest(this, interactionModel, utterance);
-        const cleanUtterance = utterance.replace(/[!"¿?|#$%\/()=+\-_<>*{}·¡\[\].,;:]/g, "");
-        const matchArray = cleanUtterance.match(new RegExp(`^${this.phraseToRegex(samplePhrase)}$`, "i"));
+    private matchesUtterances(utterance: string): SamplePhraseTest[] {
+        const matches: SamplePhraseTest[] = [];
+        for (const intentName of this.intentSchema.intentNames()) {
+            for (const sample of this.sampleUtterances.samplesForIntent(intentName)) {
+                // return new SamplePhraseTest(this, interactionModel, utterance);
+                const cleanUtterance = utterance.replace(/[!"¿?|#$%\/()=+\-_<>*{}·¡\[\].,;:]/g, "");
+                const matchArray = cleanUtterance.match(new RegExp(`^${this.phraseToRegex(sample)}$`, "i"));
 
-        // If we have a regex match, check all the slots match their types
-        if (matchArray) {
-            const slotMatches = this.checkSlots(samplePhrase, matchArray[0], matchArray.slice(1));
-            if (slotMatches) {
-                return new SamplePhraseTest(samplePhrase, slotMatches, matchArray[0]);
+                // If we have a regex match, check all the slots match their types
+                if (matchArray) {
+                    const slotMatches = this.checkSlots(sample, matchArray[0], matchArray.slice(1));
+                    if (slotMatches) {
+                        matches.push(new SamplePhraseTest(sample, slotMatches, matchArray[0]));
+                    }
+                }
             }
         }
-        return null;
+        // If we don't match anything, we use the default utterance - simple algorithm for this
+        if (!matches.length) {
+            throw new Error("Unable to match utterance: " + utterance
+                + " to an intent. Try a different utterance, or explicitly set the intent");
+        }
+
+        return matches;
     }
 
     /**
@@ -186,8 +182,8 @@ export class InteractionModel {
 
             const slotName = samplePhrase.slotNames[index];
             // Look up the slot type for the name
-            const slotType = this.intentSchema.intent(samplePhrase.intent)
-                .slots?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase());
+            const slotType = this.intentSchema.slots(samplePhrase.intent)
+                ?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase());
             if (!slotType) {
                 throw new Error(`Invalid schema - not slot: ${slotName} for intent: ${samplePhrase.intent}`);
             }
@@ -218,12 +214,7 @@ export class IntentSchema {
     }
 
     public slots(intentString: string): any[] {
-        return this._intents.find(o => o.name === intentString)?.slots;
-    }
-
-    public intent(intentString: string): Intent {
-        const intents = this._intents.map((intentJSON: any) => ({name: intentJSON.intent, slots: intentJSON.slots}));
-        return intents.find(o => o.name === intentString);
+        return this._intents.find(o => o.intent === intentString)?.slots;
     }
 
     public hasIntent(intentString: string): boolean {
@@ -294,12 +285,4 @@ type DialogSlot = {
     type: string;
     confirmationRequired: boolean;
     prompts: { [id: string]: string };
-}
-
-interface Intent {
-    name: string,
-    slots: {
-        name: string,
-        type: string
-    }[]
 }
