@@ -25,7 +25,7 @@ export class SampleUtterances {
 
   public static fromJSON(json: any) {
     return new SampleUtterances(Object.entries<any[]>(json).reduce(
-        (map, [intent, samples]) => map.set(intent, samples.map(s => new SamplePhrase(intent, s))),
+        (map, [intent, samples]) => map.set(intent, samples.map(s => new SamplePhrase(s))),
         new Map<string, SamplePhrase[]>()
     ));
   }
@@ -35,11 +35,11 @@ export class SampleUtterances {
   public addSample(intent: string, sample: string) {
     if (!this.samples.has(intent))
       this.samples.set(intent, []);
-    this.samples.get(intent).push(new SamplePhrase(intent, sample));
+    this.samples.get(intent).push(new SamplePhrase(sample));
   }
 
   public addSamples(intent: string, samples: string[]) {
-    this.samples.set(intent, samples.map(s => new SamplePhrase(intent, s)));
+    this.samples.set(intent, samples.map(s => new SamplePhrase(s)));
   }
 
   public samplesForIntent(intent: string): SamplePhrase [] {
@@ -53,5 +53,5 @@ export class SampleUtterances {
 export class SamplePhrase {
   public readonly slotNames: string[] = [];
 
-  public constructor(public intent: string, public phrase: string) {}
+  public constructor(public phrase: string) {}
 }

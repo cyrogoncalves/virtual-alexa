@@ -119,13 +119,13 @@ export class VirtualAlexa {
             resolvedUtterance = result[1];
         }
 
-        const { matchedSample, slots } = this.context.interactionModel.utterance(resolvedUtterance);
+        const { matchedSample, slots, intent } = this.context.interactionModel.utterance(resolvedUtterance);
         const json = slots?.reduce((json: any, slot: string, i: number) => {
             json[matchedSample.slotNames[i]] = slot.trim();
             return json;
         }, {}) ?? {};
         return this.request()
-            .intent(matchedSample?.intent)
+            .intent(intent)
             .slots(json)
             .send();
     }

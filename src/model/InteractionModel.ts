@@ -90,8 +90,8 @@ export class InteractionModel {
         let topMatch: any;
         let topScore = 0;
         let topScoreSlot = 0;
-        for (const intentName of this.intentSchema.intentNames()) {
-            for (const sample of this.sampleUtterances.samplesForIntent(intentName)) {
+        for (const intent of this.intentSchema.intentNames()) {
+            for (const sample of this.sampleUtterances.samplesForIntent(intent)) {
                 // Literals are in the format "sample { <literal sample> | <slotName>}" or simply {<slotName>}
                 // e.g.: "I'm an {aquarius | literal}"
                 sample.slotNames.push(...sample.phrase.match(/(?<={)[^}^|]*(?=})|(?<=\| )[^}]*/g));
@@ -106,13 +106,13 @@ export class InteractionModel {
 
                 // If we have a regex match, check all the slots match their types
                 if (matchArray) {
-                    const slotMatches = this.checkSlots(sample, matchArray[0], matchArray.slice(1));
+                    const slotMatches = this.checkSlots(intent, sample, matchArray[0], matchArray.slice(1));
                     if (slotMatches) {
                         // We assign a score based on the number of non-slot value letters that match
                         const score = matchArray[0].length - slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);
                         const scoreSlot = slotMatches.filter(slotMatch => !slotMatch.untyped).length;
                         if (!topMatch || score > topScore || topScore === score && scoreSlot > topScoreSlot) {
-                            topMatch = { matchedSample: sample, slots: slotMatches.map(slotMatch => slotMatch.value) };
+                            topMatch = { matchedSample: sample, slots: slotMatches.map(slotMatch => slotMatch.value), intent };
                             topScore = score;
                             topScoreSlot = scoreSlot;
                         }
@@ -140,7 +140,7 @@ export class InteractionModel {
         return intentSchema.hasIntent("AMAZON.PauseIntent") && intentSchema.hasIntent("AMAZON.ResumeIntent");
     }
 
-    private checkSlots(samplePhrase: SamplePhrase, input: string, slotValues: string[]): SlotMatch[] | undefined {
+    private checkSlots(intentName: string, samplePhrase: SamplePhrase, input: string, slotValues: string[]): SlotMatch[] | undefined {
         // Build an array of results - we want to pass back the exact value that matched (not change the case)
         const result: SlotMatch[] = [];
         let index = 0;
@@ -156,10 +156,10 @@ export class InteractionModel {
         for (const slotValue of slotValues) {
             const slotName = samplePhrase.slotNames[index++];
             // Look up the slot type for the name
-            const slot = this.intentSchema.slots(samplePhrase.intent)
+            const slot = this.intentSchema.slots(intentName)
                 ?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase());
             if (!slot) {
-                throw new Error(`Invalid schema - not slot: ${slotName} for intent: ${samplePhrase.intent}`);
+                throw new Error(`Invalid schema - not slot: ${slotName} for intent: ${intentName}`);
             }
 
             // If no slot type definition is provided, we just assume it is a match
