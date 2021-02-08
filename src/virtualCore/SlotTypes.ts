@@ -1,47 +1,13 @@
 export class SlotMatch {
   public untyped: boolean;
-  public constructor(public matches: boolean,
-                     public value?: string,
-                     public enumeratedValue?: ISlotValue,
-                     public slotValueSynonym?: string) {
+  public constructor(public value?: string,
+                     public enumeratedValue?: ISlotValue) {
     this.untyped = false;
-  }
-
-  static fromType(slotValue: string, slotType: SlotType) {
-    // If no slot type definition is provided, we just assume it is a match
-    if (!slotType) {
-      const match = new SlotMatch(true, slotValue);
-      match.untyped = true;
-      return match;
-    } else {
-      // return slotType.match(slotValue);
-      // Some slot types use regex - we use that if specified
-      if (slotType.regex && slotValue.trim().match(slotType.regex))
-        return new SlotMatch(true, slotValue.trim());
-
-      const matches = slotType.matchAll(slotValue);
-      if (matches.length > 0) {
-        return matches[0];
-      } else if (slotType.name.startsWith("AMAZON") && !slotType.isEnumerated()) {
-        // If this is a builtin, we still count it as a match, because we treat these as free form
-        // Unless we explicilty have enumerated the builtin - we have rarely done this so far
-        return new SlotMatch(true, slotValue);
-      }
-      return new SlotMatch(false);
-    }
   }
 }
 
 export class SlotType {
   public constructor(public name: string, public values: ISlotValue[] = [], public regex?: string) {}
-
-  public isEnumerated() {
-    return this.name === "AMAZON.NUMBER" || !this.name.startsWith("AMAZON");
-  }
-
-  public isCustom() {
-    return !this.name.startsWith("AMAZON") || this.values.some(value => !value.builtin) || undefined;
-  }
 
   public matchAll(value: string): SlotMatch[] {
     value = value.trim();
@@ -53,11 +19,11 @@ export class SlotType {
       //  https://developer.amazon.com/docs/custom-skills/
       //      define-synonyms-and-ids-for-slot-type-values-entity-resolution.html
       if (slotValue.name.value.toLowerCase() === value.toLowerCase()) {
-        matches.push(new SlotMatch(true, value, slotValue));
+        matches.push(new SlotMatch(value, slotValue));
       } else if (slotValue.name.synonyms) {
         matches.push(...slotValue.name.synonyms
             .filter(synonym => synonym.toLowerCase() === value.toLowerCase())
-            .map(synonym => new SlotMatch(true, value, slotValue, synonym)));
+            .map(() => new SlotMatch(value, slotValue)));
       }
     }
     return matches;

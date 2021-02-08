@@ -120,7 +120,7 @@ export class VirtualAlexa {
         }
 
         const { matchedSample, slots } = this.context.interactionModel.utterance(resolvedUtterance);
-        const json = slots?.reduce((json: any, slot, i) => {
+        const json = slots?.reduce((json: any, slot: string, i: number) => {
             json[matchedSample.slotNames[i]] = slot.trim();
             return json;
         }, {}) ?? {};

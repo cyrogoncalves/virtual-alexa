@@ -1,4 +1,3 @@
-import { SlotMatch } from "./SlotTypes";
 import * as fs from "fs";
 
 export class SampleUtterances {
@@ -55,27 +54,4 @@ export class SamplePhrase {
   public readonly slotNames: string[] = [];
 
   public constructor(public intent: string, public phrase: string) {}
-}
-
-export class SamplePhraseTest {
-  public constructor(
-      public samplePhrase: SamplePhrase,
-      private readonly slotMatches: SlotMatch[],
-      private matchString: string
-  ) {}
-
-  // We assign a score based on the number of non-slot value letters that match
-  public score(): number {
-    const slotValueLength = this.slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);
-    return this.matchString.length - slotValueLength;
-  }
-
-  public scoreSlots(): number {
-    return this.slotMatches.filter(slotMatch => !slotMatch.untyped).length;
-  }
-
-  public slotValues(): string [] {
-    return this.slotMatches.map(slotMatch => slotMatch.value);
-  }
-
 }

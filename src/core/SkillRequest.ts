@@ -303,7 +303,7 @@ export class SkillRequest {
             .find(o => o.name.toLowerCase() === slot.type.toLowerCase());
         // We only include the entity resolution for builtin types if they have been extended
         //  and for all custom slot types
-        if (slotType?.isCustom()) {
+        if (slotType && (!slotType.name.startsWith("AMAZON") || slotType.values.some(value => !value.builtin))) {
             // slotValueObject.setEntityResolution(this.context.applicationID(), slotType);
             const authority = `amzn1.er-authority.echo-sdk.${this.context.applicationID()}.${slotType.name}`;
             const matches = slotType.matchAll(slotValueObject.value).filter(m => m.enumeratedValue && !m.enumeratedValue.builtin);
