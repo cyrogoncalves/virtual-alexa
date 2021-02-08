@@ -119,9 +119,9 @@ export class VirtualAlexa {
             resolvedUtterance = result[1];
         }
 
-        const { matchedSample, slots, intent } = this.context.interactionModel.utterance(resolvedUtterance);
+        const { slots, intent, slotNames } = this.context.interactionModel.utterance(resolvedUtterance);
         const json = slots?.reduce((json: any, slot: string, i: number) => {
-            json[matchedSample.slotNames[i]] = slot.trim();
+            json[slotNames[i]] = slot.trim();
             return json;
         }, {}) ?? {};
         return this.request()
@@ -181,8 +181,16 @@ export class VirtualAlexaBuilder {
      * @returns {VirtualAlexaBuilder}
      */
     public interactionModelFile(filePath: string): VirtualAlexaBuilder {
-        this._model = InteractionModel.fromFile(filePath);
-        return this;
+        // Parse the all-in-one interaction model as a file
+        try {
+            const data = fs.readFileSync(filePath);
+            const json = JSON.parse(data.toString());
+            return this.interactionModel(json);
+        } catch (error) {
+            throw !error.message.includes("ENOENT") ? error : new Error(
+                "The interaction model for your Alexa Skill could not be found under:\n" +
+                    filePath + "\nPlease provide the correct location of the Interaction Model.");
+        }
     }
 
     /**
@@ -252,18 +260,21 @@ export class VirtualAlexaBuilder {
     }
 
     public create(): VirtualAlexa {
-        let model = this._model || InteractionModel.fromLocale(this._locale);
-        if (!model) {
-            throw new Error(
-                "Either an interaction model or intent schema and sample utterances must be provided.\n" +
-                "Alternatively, if you specify a locale, Virtual Alexa will automatically check for the " +
-                "interaction model under the directory \"./models\" - e.g., \"./models/en-US.json\"");
+        if (!this._model) {
+            const modelPath = `./models/${this._locale}.json`;
+            if (!fs.existsSync(modelPath)) {
+                throw new Error(
+                    "Either an interaction model or intent schema and sample utterances must be provided.\n" +
+                    "Alternatively, if you specify a locale, Virtual Alexa will automatically check for the " +
+                    "interaction model under the directory \"./models\" - e.g., \"./models/en-US.json\"");
+            }
+            this.interactionModelFile(modelPath);
         }
 
         if (!this._interactor) {
             throw new Error("Either a handler or skillURL must be provided.");
         }
 
-        return new VirtualAlexa(this._interactor, model, this._locale, this._applicationID);
+        return new VirtualAlexa(this._interactor, this._model, this._locale, this._applicationID);
     }
 }

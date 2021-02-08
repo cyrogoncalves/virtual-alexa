@@ -1,7 +1,9 @@
 import { SlotType } from '../src/virtualCore/SlotTypes';
 import { assert } from "chai";
 import { IntentSchema, InteractionModel } from "../src/model/InteractionModel";
-import { SamplePhrase, SampleUtterances } from '../src/virtualCore/SampleUtterances';
+import { SampleUtterances } from '../src/virtualCore/SampleUtterances';
+import { VirtualAlexa } from '../src';
+import * as fs from "fs";
 
 describe("UtteranceTest", function() {
     this.timeout(10000);
@@ -95,16 +97,14 @@ describe("UtteranceTest", function() {
         SampleUtterances.fromJSON(sampleUtterances),
         slotTypes);
 
-    const japaneseModel = InteractionModel.fromFile("./test/resources/japanese_skill/models/ja-JP.json");
-
-    const slotIndex = (matchedSample: SamplePhrase, name: string): number => {
-      return matchedSample.slotNames.findIndex(slotName => slotName.toLowerCase() === name.toLowerCase());
+    const slotIndex = (slotNames: string[], name: string): number => {
+      return slotNames.findIndex(slotName => slotName.toLowerCase() === name.toLowerCase());
     }
 
     describe("#matchIntent", () => {
         it("Sends correct error message on missing interaction ", () => {
             try {
-                InteractionModel.fromFile("./test/resources/wrong-file.json");
+                VirtualAlexa.Builder().interactionModelFile("./test/resources/wrong-file.json");
             } catch (error) {
                 assert.isTrue(error.message.includes("The interaction model for your Alexa Skill could not be"));
             }
@@ -131,10 +131,10 @@ describe("UtteranceTest", function() {
         });
 
         it("Matches a slotted phrase", () => {
-            const { matchedSample, slots, intent } = model.utterance("slot value");
+            const { slots, intent, slotNames } = model.utterance("slot value");
             assert.equal(intent, "SlottedIntent");
             assert.equal(slots?.[0]?.trim(), "value");
-            const index = slotIndex(matchedSample, "SlotName");
+            const index = slotIndex(slotNames, "SlotName");
             assert.equal(slots?.[index]?.trim(), "value");
         });
 
@@ -144,32 +144,32 @@ describe("UtteranceTest", function() {
         });
 
         it("Matches a phrase with multiple slots", () => {
-            const { matchedSample, slots, intent } = model.utterance("multiple a and b");
+            const { slotNames, slots, intent } = model.utterance("multiple a and b");
             assert.equal(intent, "MultipleSlots");
             assert.equal(slots?.[0]?.trim(), "a");
             assert.equal(slots?.[1]?.trim(), "b");
-            const indexA = slotIndex(matchedSample, "SlotA");
+            const indexA = slotIndex(slotNames, "SlotA");
             assert.equal(slots?.[indexA]?.trim(), "a");
-            const indexB = slotIndex(matchedSample, "SlotB");
+            const indexB = slotIndex(slotNames, "SlotB");
             assert.equal(slots?.[indexB]?.trim(), "b");
         });
 
         it("Matches a phrase with multiple slots reversed", () => {
-            const { matchedSample, slots, intent } = model.utterance("reversed a then b");
+            const { slotNames, slots, intent } = model.utterance("reversed a then b");
             assert.equal(intent, "MultipleSlots");
             assert.equal(slots?.[0]?.trim(), "a");
             assert.equal(slots?.[1]?.trim(), "b");
-            const indexA = slotIndex(matchedSample, "SlotA");
+            const indexA = slotIndex(slotNames, "SlotA");
             assert.equal(slots?.[indexA]?.trim(), "b");
-            const indexB = slotIndex(matchedSample, "SlotB");
+            const indexB = slotIndex(slotNames, "SlotB");
             assert.equal(slots?.[indexB]?.trim(), "a");
         });
 
         it("Matches a phrase with slot with enumerated values", () => {
-            const { matchedSample, slots, intent } = model.utterance("US");
+            const { slotNames, slots, intent } = model.utterance("US");
             assert.equal(intent, "CustomSlot");
             assert.equal(slots?.[0]?.trim(), "US");
-            assert.equal(slots?.[slotIndex(matchedSample, "country")]?.trim(), "US");
+            assert.equal(slots?.[slotIndex(slotNames, "country")]?.trim(), "US");
         });
 
         it("Does not match a phrase with slot with enumerated values", () => {
@@ -178,24 +178,24 @@ describe("UtteranceTest", function() {
         });
 
         it("Matches a phrase with slot with number value", () => {
-            const { matchedSample, slots, intent } = model.utterance("19801");
+            const { slotNames, slots, intent } = model.utterance("19801");
             assert.equal(intent, "NumberSlot");
             assert.equal(slots?.[0]?.trim(), "19801");
-            assert.equal(slots?.[slotIndex(matchedSample, "number")]?.trim(), "19801");
+            assert.equal(slots?.[slotIndex(slotNames, "number")]?.trim(), "19801");
         });
 
         it("Matches a phrase with slot with long-form number value", () => {
-            const { matchedSample, slots, intent } = model.utterance("one");
+            const { slotNames, slots, intent } = model.utterance("one");
             assert.equal(intent, "NumberSlot");
             assert.equal(slots?.[0]?.trim(), "one");
-            assert.equal(slots?.[slotIndex(matchedSample, "number")]?.trim(), "one");
+            assert.equal(slots?.[slotIndex(slotNames, "number")]?.trim(), "one");
 
             const utterance2 = model.utterance("Thirteen");
-            const utterance2index = slotIndex(utterance2.matchedSample, "number");
+            const utterance2index = slotIndex(utterance2.slotNames, "number");
             assert.equal(utterance2.slots?.[utterance2index]?.trim(), "Thirteen");
 
             const utterance3 = model.utterance(" ten ");
-            const utterance3index = slotIndex(utterance3.matchedSample, "number");
+            const utterance3index = slotIndex(utterance3.slotNames, "number");
             assert.equal(utterance3.slots?.[utterance3index]?.trim(), "ten");
         });
 
@@ -220,11 +220,15 @@ describe("UtteranceTest", function() {
         });
 
         describe("Matches for International Languages", function() {
+            const data = fs.readFileSync("./test/resources/japanese_skill/models/ja-JP.json");
+            const json = JSON.parse(data.toString());
+            const japaneseModel = InteractionModel.fromJSON(json)
+
             it("Matches a slotted phrase", () => {
-                const { matchedSample, slots, intent } = japaneseModel.utterance("5 人のプレーヤー");
+                const { slotNames, slots, intent } = japaneseModel.utterance("5 人のプレーヤー");
                 assert.equal(intent, "GetIntentWithSlot");
                 assert.equal(slots?.[0]?.trim(), "5");
-                assert.equal(slots?.[slotIndex(matchedSample, "number")]?.trim(), "5");
+                assert.equal(slots?.[slotIndex(slotNames, "number")]?.trim(), "5");
             });
 
             it("Matches a slotted phrase, no slot value", () => {

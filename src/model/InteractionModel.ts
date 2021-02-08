@@ -1,6 +1,5 @@
-import * as fs from "fs";
 import { BuiltinSlotTypes, SlotMatch, SlotType } from "../virtualCore/SlotTypes";
-import { SamplePhrase, SampleUtterances } from "../virtualCore/SampleUtterances";
+import { SampleUtterances } from "../virtualCore/SampleUtterances";
 import { AudioBuiltinIntents } from "../audioPlayer/AudioPlayer";
 import { ConfirmationStatus } from '../core/SkillContext';
 
@@ -10,23 +9,6 @@ import { ConfirmationStatus } from '../core/SkillContext';
  * Then can take a phrase and create an intentName request based on it
  */
 export class InteractionModel {
-
-    // Parse the all-in-one interaction model as a file
-    public static fromFile(interactionModelFile: any): InteractionModel {
-        try {
-            const data = fs.readFileSync(interactionModelFile);
-            const json = JSON.parse(data.toString());
-            return InteractionModel.fromJSON(json);
-        } catch (error) {
-            if (error.message.includes("ENOENT")) {
-                throw new Error("The interaction model for your Alexa Skill could not be found under:\n" +
-                    interactionModelFile +
-                    "\nPlease provide the correct location of the Interaction Model.")
-            }
-            throw error;
-        }
-    }
-
     // Parse the all-in-one interaction model as JSON
     // Using this for reference:
     //  https://github.com/alexa/skill-sample-nodejs-team-lookup/blob/master/speech-assets/interaction-model.json
@@ -53,15 +35,6 @@ export class InteractionModel {
         const schema = new IntentSchema(languageModel.intents);
         const samples = SampleUtterances.fromJSON(sampleJSON);
         return new InteractionModel(schema, samples, languageModel.types || [], model.prompts ?? [], model.dialog?.intents);
-    }
-
-    public static fromLocale(locale: string): InteractionModel {
-        const modelPath = "./models/" + locale + ".json";
-        if (!fs.existsSync(modelPath)) {
-            return undefined;
-        }
-
-        return InteractionModel.fromFile(modelPath);
     }
 
     public readonly slotTypes?: SlotType[];
@@ -94,7 +67,7 @@ export class InteractionModel {
             for (const sample of this.sampleUtterances.samplesForIntent(intent)) {
                 // Literals are in the format "sample { <literal sample> | <slotName>}" or simply {<slotName>}
                 // e.g.: "I'm an {aquarius | literal}"
-                sample.slotNames.push(...sample.phrase.match(/(?<={)[^}^|]*(?=})|(?<=\| )[^}]*/g));
+                const slotNames = sample.phrase.match(/(?<={)[^}^|]*(?=})|(?<=\| )[^}]*/g) || [];
                 // Takes a phrase like "This is a {Slot}" and turns it into a regex like "This is a(.*)".
                 // This is so we can compare the sample utterances
                 const samplePhrase = sample.phrase.replace(/\s*{[^}]*}\s*/gi, "(.*)");
@@ -106,13 +79,13 @@ export class InteractionModel {
 
                 // If we have a regex match, check all the slots match their types
                 if (matchArray) {
-                    const slotMatches = this.checkSlots(intent, sample, matchArray[0], matchArray.slice(1));
+                    const slotMatches = this.checkSlots(intent, slotNames, matchArray[0], matchArray.slice(1));
                     if (slotMatches) {
                         // We assign a score based on the number of non-slot value letters that match
                         const score = matchArray[0].length - slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);
                         const scoreSlot = slotMatches.filter(slotMatch => !slotMatch.untyped).length;
                         if (!topMatch || score > topScore || topScore === score && scoreSlot > topScoreSlot) {
-                            topMatch = { matchedSample: sample, slots: slotMatches.map(slotMatch => slotMatch.value), intent };
+                            topMatch = { matchedSample: sample, slots: slotMatches.map(slotMatch => slotMatch.value), intent, slotNames };
                             topScore = score;
                             topScoreSlot = scoreSlot;
                         }
@@ -140,7 +113,7 @@ export class InteractionModel {
         return intentSchema.hasIntent("AMAZON.PauseIntent") && intentSchema.hasIntent("AMAZON.ResumeIntent");
     }
 
-    private checkSlots(intentName: string, samplePhrase: SamplePhrase, input: string, slotValues: string[]): SlotMatch[] | undefined {
+    private checkSlots(intentName: string, slotNames: string[], input: string, slotValues: string[]): SlotMatch[] | undefined {
         // Build an array of results - we want to pass back the exact value that matched (not change the case)
         const result: SlotMatch[] = [];
         let index = 0;
@@ -154,7 +127,7 @@ export class InteractionModel {
 
         // We check each slot value against valid values
         for (const slotValue of slotValues) {
-            const slotName = samplePhrase.slotNames[index++];
+            const slotName = slotNames[index++];
             // Look up the slot type for the name
             const slot = this.intentSchema.slots(intentName)
                 ?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase());
@@ -262,12 +235,10 @@ interface DialogIntent {
     name: string;
     confirmationRequired: boolean;
     prompts: any;
-    slots: DialogSlot[];
-}
-
-type DialogSlot = {
-    name: string;
-    type: string;
-    confirmationRequired: boolean;
-    prompts: { [id: string]: string };
+    slots: {
+        name: string;
+        type: string;
+        confirmationRequired: boolean;
+        prompts: { [id: string]: string };
+    }[];
 }
