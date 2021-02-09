@@ -1,7 +1,7 @@
 import { ConfirmationStatus, DialogState, SkillContext } from './SkillContext';
 import { AudioPlayerActivity } from '../audioPlayer/AudioPlayer';
 import * as _ from 'lodash';
-import { SlotValue } from '../model/InteractionModel';
+import { EntityResolutionStatus, EntityResolutionValue, SlotMatch, SlotValue } from '../model/InteractionModel';
 import { SkillResponse } from './SkillResponse';
 import * as uuid from 'uuid';
 import { RequestFilter } from './VirtualAlexa';
@@ -306,13 +306,33 @@ export class SkillRequest {
         if (slotType && (!slotType.name.startsWith("AMAZON") || slotType.values.some(value => !value.builtin))) {
             // slotValueObject.setEntityResolution(this.context.applicationID(), slotType);
             const authority = `amzn1.er-authority.echo-sdk.${this.context.applicationID()}.${slotType.name}`;
-            const matches = slotType.matchAll(slotValueObject.value).filter(m => m.enumeratedValue && !m.enumeratedValue.builtin);
+
+            const value = slotValueObject.value.trim();
+            const matches: SlotMatch[] = [];
+            for (const slotValue of slotType.values) {
+                if (!slotValue.builtin) {
+                    // First check the name value - the value and the synonyms are both valid matches
+                    // Refer here for definitive rules:
+                    //  https://developer.amazon.com/docs/custom-skills/
+                    //      define-synonyms-and-ids-for-slot-type-values-entity-resolution.html
+                    if (slotValue.name.value.toLowerCase() === value.toLowerCase()) {
+                        matches.push(new SlotMatch(value, slotValue));
+                    } else if (slotValue.name.synonyms) {
+                        matches.push(...slotValue.name.synonyms
+                            .filter(synonym => synonym.toLowerCase() === value.toLowerCase())
+                            .map(() => new SlotMatch(value, slotValue)));
+                    }
+                }
+            }
+
+            if (!slotValueObject.resolutionsPerAuthority)
+                slotValueObject.resolutionsPerAuthority = [];
             // If this is not a builtin value, we add the entity resolution
             if (!matches.length) {
-                slotValueObject.addEntityResolution(authority);
+                this.addEntityResolution(slotValueObject.resolutionsPerAuthority, authority);
             } else {
                 // Possible to have multiple matches, where we have overlapping synonyms
-                matches.forEach(match => slotValueObject.addEntityResolution(authority,
+                matches.forEach(match => this.addEntityResolution(slotValueObject.resolutionsPerAuthority, authority,
                     [{ value: { id: match.enumeratedValue.id, name: match.enumeratedValue.name.value } }]));
             }
         }
@@ -387,5 +407,15 @@ export class SkillRequest {
     public slotStatus(slotName: string, confirmationStatus: ConfirmationStatus): SkillRequest {
         this.context.dialogManager.slots()[slotName].confirmationStatus = confirmationStatus;
         return this;
+    }
+
+    private addEntityResolution(resolutionsPerAuthority: any[], authority: string, values: EntityResolutionValue[] = []) {
+        const existingResolution = resolutionsPerAuthority.find(resolution => resolution.authority === authority);
+        if (existingResolution) {
+            existingResolution.values.push(values[0]);
+        } else {
+            const code = values?.length ? EntityResolutionStatus.ER_SUCCESS_MATCH : EntityResolutionStatus.ER_SUCCESS_NO_MATCH
+            resolutionsPerAuthority.push({ authority, values, status: { code } });
+        }
     }
 }

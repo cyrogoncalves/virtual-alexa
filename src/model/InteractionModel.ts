@@ -1,4 +1,3 @@
-import { BuiltinSlotTypes, SlotMatch, SlotType } from "../virtualCore/SlotTypes";
 import { AudioBuiltinIntents } from "../audioPlayer/AudioPlayer";
 import { ConfirmationStatus } from '../core/SkillContext';
 
@@ -35,6 +34,40 @@ export class InteractionModel {
         return new InteractionModel(schema, sampleJSON, languageModel.types || [], model.prompts ?? [], model.dialog?.intents);
     }
 
+    private static LONG_FORM_VALUES: {[id: string]: string []} = {
+        1: ["one"],
+        2: ["two"],
+        3: ["three"],
+        4: ["four"],
+        5: ["five"],
+        6: ["six"],
+        7: ["seven"],
+        8: ["eight"],
+        9: ["nine"],
+        10: ["ten"],
+        11: ["eleven"],
+        12: ["twelve"],
+        13: ["thirteen"],
+        14: ["fourteen"],
+        15: ["fifteen"],
+        16: ["sixteen"],
+        17: ["seventeen"],
+        18: ["eighteen"],
+        19: ["nineteen"],
+        20: ["twenty"],
+    };
+
+    private static LONG_FORM_SLOT_VALUES(): ISlotValue[] {
+        return Object.keys(InteractionModel.LONG_FORM_VALUES).map(key => ({
+            id: key,
+            builtin: true,
+            name: {
+                value: key,
+                synonyms: InteractionModel.LONG_FORM_VALUES[key]
+            }
+        }));
+    }
+
     public readonly slotTypes?: SlotType[];
 
     public constructor(public intentSchema: IntentSchema,
@@ -44,7 +77,7 @@ export class InteractionModel {
                        public dialogIntents?: DialogIntent[]) {
         this.slotTypes = [
             ...slotTypesObj.map(type => new SlotType(type.name, type.values)),
-            ...BuiltinSlotTypes.values()
+            new SlotType("AMAZON.NUMBER", InteractionModel.LONG_FORM_SLOT_VALUES(), "^[0-9]*$")
         ];
 
         // We add each phrase one-by-one. It is possible the built-ins have additional samples defined
@@ -197,29 +230,16 @@ export class SlotValue {
         public value: string,
         public confirmationStatus = ConfirmationStatus.NONE
     ) {}
-
-    public addEntityResolution(authority: string, values: EntityResolutionValue[] = []) {
-        if (!this.resolutionsPerAuthority)
-            this.resolutionsPerAuthority = [];
-
-        const existingResolution = this.resolutionsPerAuthority.find(resolution => resolution.authority === authority);
-        if (existingResolution) {
-            existingResolution.values.push(values[0]);
-        } else {
-            const code = values?.length ? EntityResolutionStatus.ER_SUCCESS_MATCH : EntityResolutionStatus.ER_SUCCESS_NO_MATCH
-            this.resolutionsPerAuthority.push({ authority, values, status: { code } });
-        }
-    }
 }
 
-interface EntityResolutionValue {
+export interface EntityResolutionValue {
     value: {
         id: string,
         name: string
     }
 }
 
-enum EntityResolutionStatus {
+export enum EntityResolutionStatus {
     ER_SUCCESS_MATCH = "ER_SUCCESS_MATCH",
     ER_SUCCESS_NO_MATCH = "ER_SUCCESS_NO_MATCH",
     // ER_ERROR_TIMEOUT = "ER_ERROR_TIMEOUT",
@@ -236,4 +256,25 @@ interface DialogIntent {
         confirmationRequired: boolean;
         prompts: { [id: string]: string };
     }[];
+}
+
+export class SlotMatch {
+    public untyped: boolean;
+    public constructor(public value?: string,
+                       public enumeratedValue?: ISlotValue) {
+        this.untyped = false;
+    }
+}
+
+export class SlotType {
+    public constructor(public name: string, public values: ISlotValue[] = [], public regex?: string) {}
+}
+
+interface ISlotValue {
+    id?: string;
+    builtin?: boolean;
+    name: {
+        value: string;
+        synonyms: string[];
+    };
 }

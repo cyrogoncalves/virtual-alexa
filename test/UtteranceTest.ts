@@ -1,6 +1,5 @@
-import { SlotType } from '../src/virtualCore/SlotTypes';
 import { assert } from "chai";
-import { IntentSchema, InteractionModel } from "../src/model/InteractionModel";
+import { IntentSchema, InteractionModel, SlotType } from "../src/model/InteractionModel";
 import { VirtualAlexa } from '../src';
 import * as fs from "fs";
 
