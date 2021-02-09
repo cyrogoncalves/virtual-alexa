@@ -1,7 +1,6 @@
 import { SlotType } from '../src/virtualCore/SlotTypes';
 import { assert } from "chai";
 import { IntentSchema, InteractionModel } from "../src/model/InteractionModel";
-import { SampleUtterances } from '../src/virtualCore/SampleUtterances';
 import { VirtualAlexa } from '../src';
 import * as fs from "fs";
 
@@ -93,9 +92,7 @@ describe("UtteranceTest", function() {
         ],
     }] as SlotType[];
 
-    const model = new InteractionModel(new IntentSchema(intentSchema.intents),
-        SampleUtterances.fromJSON(sampleUtterances),
-        slotTypes);
+    const model = new InteractionModel(new IntentSchema(intentSchema.intents), sampleUtterances, slotTypes);
 
     const slotIndex = (slotNames: string[], name: string): number => {
       return slotNames.findIndex(slotName => slotName.toLowerCase() === name.toLowerCase());

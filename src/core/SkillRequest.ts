@@ -161,7 +161,7 @@ export class SkillRequest {
     public intent(intentName: string, confirmationStatus: ConfirmationStatus = ConfirmationStatus.NONE): SkillRequest {
         this.requestType(RequestType.INTENT_REQUEST);
         if (!intentName.startsWith("AMAZON")) { // no built-in
-            if (!this.context.interactionModel.intentSchema.hasIntent(intentName)) {
+            if (!this.context.interactionModel.intentSchema.intents.some(o => o.intent === intentName)) {
                 throw new Error("Interaction model has no intentName named: " + intentName);
             }
         }

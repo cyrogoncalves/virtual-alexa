@@ -5,7 +5,6 @@ import { LocalSkillInteractor } from "../impl/LocalSkillInteractor";
 import { RemoteSkillInteractor } from "../impl/RemoteSkillInteractor";
 import { SkillInteractor } from "../impl/SkillInteractor";
 import { IntentSchema, InteractionModel } from "../model/InteractionModel";
-import { SampleUtterances } from "../virtualCore/SampleUtterances";
 import { SkillContext } from "./SkillContext";
 import { SessionEndedReason, SkillRequest } from "./SkillRequest";
 import { SkillResponse } from "./SkillResponse";
@@ -206,8 +205,8 @@ export class VirtualAlexaBuilder {
      * @param utterances The sample utterances in JSON format
      * @returns {VirtualAlexaBuilder}
      */
-    public intentSchema(schema: any, utterances: any): VirtualAlexaBuilder {
-        this._model = new InteractionModel(new IntentSchema(schema.intents), SampleUtterances.fromJSON(utterances));
+    public intentSchema(schema: any, utterances: { [intent: string]: string[] }): VirtualAlexaBuilder {
+        this._model = new InteractionModel(new IntentSchema(schema.intents), utterances);
         return this;
     }
 
@@ -221,8 +220,31 @@ export class VirtualAlexaBuilder {
         const data = fs.readFileSync(intentSchemaFilePath);
         const json = JSON.parse(data.toString());
         const schema = new IntentSchema(json.intents);
-        const utterances = SampleUtterances.fromFile(sampleUtterancesFilePath);
-        this._model = new InteractionModel(schema, utterances);
+
+        // const utterances = SampleUtterances.fromFile(sampleUtterancesFilePath);
+        const utterancesData = fs.readFileSync(sampleUtterancesFilePath);
+        const lines = utterancesData.toString().split("\n");
+        const utterancesJson: {[intent: string]: string[]} = {};
+        for (const line of lines) {
+            if (line.trim().length === 0) {
+                // We skip blank lines - which is what Alexa does
+                continue;
+            }
+
+            const index = line.indexOf(" ");
+            if (index === -1) {
+                throw Error("Invalid sample utterance: " + line);
+            }
+
+            const intent = line.substr(0, index);
+            const sample = line.substr(index).trim();
+            if (!utterancesJson[intent]) {
+                utterancesJson[intent] = []
+            }
+            utterancesJson[intent].push(sample);
+        }
+
+        this._model = new InteractionModel(schema, utterancesJson);
         return this;
     }
 

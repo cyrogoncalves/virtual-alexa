@@ -1,5 +1,4 @@
 import { BuiltinSlotTypes, SlotMatch, SlotType } from "../virtualCore/SlotTypes";
-import { SampleUtterances } from "../virtualCore/SampleUtterances";
 import { AudioBuiltinIntents } from "../audioPlayer/AudioPlayer";
 import { ConfirmationStatus } from '../core/SkillContext';
 
@@ -33,14 +32,13 @@ export class InteractionModel {
         }
 
         const schema = new IntentSchema(languageModel.intents);
-        const samples = SampleUtterances.fromJSON(sampleJSON);
-        return new InteractionModel(schema, samples, languageModel.types || [], model.prompts ?? [], model.dialog?.intents);
+        return new InteractionModel(schema, sampleJSON, languageModel.types || [], model.prompts ?? [], model.dialog?.intents);
     }
 
     public readonly slotTypes?: SlotType[];
 
     public constructor(public intentSchema: IntentSchema,
-                       public sampleUtterances: SampleUtterances,
+                       private sampleUtterances: { [intent: string]: string[] },
                        slotTypesObj: any[] = [],
                        public prompts?: SlotPrompt[],
                        public dialogIntents?: DialogIntent[]) {
@@ -51,9 +49,11 @@ export class InteractionModel {
 
         // We add each phrase one-by-one. It is possible the built-ins have additional samples defined
         for (const [key, phrases] of Object.entries(AudioBuiltinIntents)) {
-            if (intentSchema.hasIntent(key)) {
+            if (this.intentSchema.intents.some(o => o.intent === key)) {
                 for (const phrase of phrases) {
-                    sampleUtterances.addSample(key, phrase);
+                    if (!sampleUtterances[key])
+                        sampleUtterances[key] = [];
+                    sampleUtterances[key].push(phrase);
                 }
             }
         }
@@ -63,33 +63,42 @@ export class InteractionModel {
         let topMatch: any;
         let topScore = 0;
         let topScoreSlot = 0;
-        for (const intent of this.intentSchema.intentNames()) {
-            for (const sample of this.sampleUtterances.samplesForIntent(intent)) {
-                // Literals are in the format "sample { <literal sample> | <slotName>}" or simply {<slotName>}
-                // e.g.: "I'm an {aquarius | literal}"
-                const slotNames = sample.phrase.match(/(?<={)[^}^|]*(?=})|(?<=\| )[^}]*/g) || [];
+        for (const intent of this.intentSchema.intents.map(intentJSON => intentJSON.intent)) {
+            for (const sample of this.sampleUtterances[intent] || []) {
                 // Takes a phrase like "This is a {Slot}" and turns it into a regex like "This is a(.*)".
                 // This is so we can compare the sample utterances
-                const samplePhrase = sample.phrase.replace(/\s*{[^}]*}\s*/gi, "(.*)");
+                const samplePhrase = sample.replace(/\s*{[^}]*}\s*/gi, "(.*)");
                 const cleanUtterance = utterance.replace(/[!"¿?|#$%\/()=+\-_<>*{}·¡\[\].,;:]/g, "");
                 // We make the regex lowercase, so that we match a phrase regardless of case
                 // We only switch to lowercase here because if we change the slotnames to lowercase,
                 //  it throws off the slot matching
                 const matchArray = cleanUtterance.match(new RegExp(`^${samplePhrase}$`, "i"));
+                if (!matchArray) {
+                    continue;
+                }
 
                 // If we have a regex match, check all the slots match their types
-                if (matchArray) {
-                    const slotMatches = this.checkSlots(intent, slotNames, matchArray[0], matchArray.slice(1));
-                    if (slotMatches) {
-                        // We assign a score based on the number of non-slot value letters that match
-                        const score = matchArray[0].length - slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);
-                        const scoreSlot = slotMatches.filter(slotMatch => !slotMatch.untyped).length;
-                        if (!topMatch || score > topScore || topScore === score && scoreSlot > topScoreSlot) {
-                            topMatch = { matchedSample: sample, slots: slotMatches.map(slotMatch => slotMatch.value), intent, slotNames };
-                            topScore = score;
-                            topScoreSlot = scoreSlot;
-                        }
-                    }
+                const slotValues = matchArray.slice(1);
+                if (slotValues.some(v => matchArray[0] !== v && v.trim().length > 0 && !v.startsWith(" ") && !v.endsWith(" "))) {
+                    continue;
+                }
+                const slotNames = sample.match(/(?<={)[^}^|]*(?=})|(?<=\| )[^}]*/g) || [];
+                const slotMatches = this.checkSlots(intent, slotNames, slotValues);
+                if (!slotMatches) {
+                    continue;
+                }
+
+                const score = matchArray[0].length - slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);
+                const scoreSlot = slotMatches.filter(slotMatch => !slotMatch.untyped).length;
+                if (!topMatch || score > topScore || topScore === score && scoreSlot > topScoreSlot) {
+                    topMatch = {
+                        matchedSample: sample,
+                        slots: slotMatches.map(slotMatch => slotMatch.value),
+                        intent,
+                        slotNames
+                    };
+                    topScore = score;
+                    topScoreSlot = scoreSlot;
                 }
             }
         }
@@ -108,75 +117,61 @@ export class InteractionModel {
         return this.prompts?.find(prompt => prompt.id === id) || undefined;
     }
 
-    public audioPlayerSupported(intentSchema: IntentSchema) : boolean {
-        // Audio player must have pause and resume intents in the model
-        return intentSchema.hasIntent("AMAZON.PauseIntent") && intentSchema.hasIntent("AMAZON.ResumeIntent");
-    }
-
-    private checkSlots(intentName: string, slotNames: string[], input: string, slotValues: string[]): SlotMatch[] | undefined {
+    private checkSlots(intent: string, slotNames: string[], slotValues: string[]): SlotMatch[] | undefined {
         // Build an array of results - we want to pass back the exact value that matched (not change the case)
         const result: SlotMatch[] = [];
         let index = 0;
-
-        // If the whole of the match is not a slot, make sure there is a leading or trailing space on the slot
-        // This is to avoid matching a sample like "sample {slot}" with "sampleslot"
-        // Ideally, this would be done as a regex - seemingly possible, but the regex is very confusing
-        if (slotValues.some(v => input !== v && v.trim().length > 0 && !v.startsWith(" ") && !v.endsWith(" "))) {
-            return undefined;
-        }
-
         // We check each slot value against valid values
         for (const slotValue of slotValues) {
             const slotName = slotNames[index++];
             // Look up the slot type for the name
-            const slot = this.intentSchema.slots(intentName)
-                ?.find(slot => slotName.toLowerCase() === slot.name.toLowerCase());
+            const slot = this.intentSchema.intents.find(o => o.intent === intent)?.slots
+                ?.find((slot: any) => slotName.toLowerCase() === slot.name.toLowerCase());
             if (!slot) {
-                throw new Error(`Invalid schema - not slot: ${slotName} for intent: ${intentName}`);
+                throw new Error(`Invalid schema - not slot: ${slotName} for intent: ${intent}`);
             }
 
             // If no slot type definition is provided, we just assume it is a match
             const slotType = this.slotTypes.find(o => o.name.toLowerCase() === slot.type.toLowerCase());
-            if (!slotType) {
-                const match = new SlotMatch(slotValue);
-                match.untyped = true;
-                result.push(match);
-            } else if (slotType.regex && slotValue.trim().match(slotType.regex)) {
-                // Some slot types use regex - we use that if specified
-                result.push(new SlotMatch(slotValue.trim()));
-            } else {
-                const slotValueTrimmed = slotValue.trim();
-                const match = slotType.values.find(v => v.name.value.toLowerCase() === slotValueTrimmed.toLowerCase()
-                    || v.name.synonyms?.some(synonym => synonym.toLowerCase() === slotValueTrimmed.toLowerCase()));
-                if (match) {
-                    result.push(new SlotMatch(slotValueTrimmed, match));
-                } else if (slotType.name.startsWith("AMAZON") && slotType.name !== "AMAZON.NUMBER") {
-                    // If this is a builtin, we still count it as a match, because we treat these as free form
-                    // Unless we explicilty have enumerated the builtin - we have rarely done this so far
-                    result.push(new SlotMatch(slotValue));
-                } else {
-                    return undefined;
-                }
+            const slotMatch = this.matchSlot(slotType, slotValue);
+            if (!slotMatch) {
+                return undefined;
             }
+            result.push(slotMatch);
         }
 
         return result;
     }
+
+    private matchSlot(slotType: SlotType, slotValue: string): SlotMatch {
+        if (!slotType) {
+            const match = new SlotMatch(slotValue);
+            match.untyped = true;
+            return match;
+        } else if (slotType.regex && slotValue.trim().match(slotType.regex)) {
+            // Some slot types use regex - we use that if specified
+            return new SlotMatch(slotValue.trim());
+        } else {
+            const slotValueTrimmed = slotValue.trim();
+            const match = slotType.values.find(v => v.name.value.toLowerCase() === slotValueTrimmed.toLowerCase()
+                || v.name.synonyms?.some(synonym => synonym.toLowerCase() === slotValueTrimmed.toLowerCase()));
+            if (match) {
+                return new SlotMatch(slotValueTrimmed, match);
+            } else if (slotType.name.startsWith("AMAZON") && slotType.name !== "AMAZON.NUMBER") {
+                // If this is a builtin, we still count it as a match, because we treat these as free form
+                // Unless we explicilty have enumerated the builtin - we have rarely done this so far
+                return new SlotMatch(slotValue);
+            }
+        }
+        return undefined;
+    }
 }
 
 export class IntentSchema {
-    public constructor(private _intents: any[]) {}
+    public constructor(public intents: any[]) {}
 
-    public intentNames(): string[] {
-        return this._intents.map(intentJSON => intentJSON.intent);
-    }
-
-    public slots(intentString: string): any[] {
-        return this._intents.find(o => o.intent === intentString)?.slots;
-    }
-
-    public hasIntent(intentString: string): boolean {
-        return this._intents.some(o => o.intent === intentString);
+    public slots(intentName: string): any[] {
+        return this.intents.find(o => o.intent === intentName)?.slots;
     }
 }
 
