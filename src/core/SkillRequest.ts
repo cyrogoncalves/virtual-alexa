@@ -1,11 +1,10 @@
 import { ConfirmationStatus, DialogState, SkillContext } from './SkillContext';
 import { AudioPlayerActivity } from '../audioPlayer/AudioPlayer';
 import * as _ from 'lodash';
-import { EntityResolutionStatus, EntityResolutionValue, SlotMatch, SlotValue } from '../model/InteractionModel';
+import { SlotMatch } from '../model/InteractionModel';
 import { SkillResponse } from './SkillResponse';
 import * as uuid from 'uuid';
-import { RequestFilter } from './VirtualAlexa';
-import { SkillInteractor } from '../impl/SkillInteractor';
+import { SkillInteractor } from '../interactor';
 
 
 export enum RequestType {
@@ -42,7 +41,7 @@ export class SkillRequest {
     public constructor(
         private readonly context: SkillContext,
         private readonly _interactor: SkillInteractor,
-        private requestFilter: RequestFilter
+        private requestFilter: (request: any) => void
     ) {
         // First create the header part of the request
         this.json = {
@@ -161,7 +160,7 @@ export class SkillRequest {
     public intent(intentName: string, confirmationStatus: ConfirmationStatus = ConfirmationStatus.NONE): SkillRequest {
         this.requestType(RequestType.INTENT_REQUEST);
         if (!intentName.startsWith("AMAZON")) { // no built-in
-            if (!this.context.interactionModel.intentSchema.intents.some(o => o.intent === intentName)) {
+            if (!this.context.interactionModel.intents.some(o => o.intent === intentName)) {
                 throw new Error("Interaction model has no intentName named: " + intentName);
             }
         }
@@ -173,7 +172,7 @@ export class SkillRequest {
         };
 
         // Set default slot values - all slots must have a value for an intent
-        const slots = this.context.interactionModel.intentSchema.slots(intentName);
+        const slots = this.context.interactionModel.intents.find(o => o.intent === intentName)?.slots;
         slots?.forEach((intentSlot: any) =>
             this.json.request.intent.slots[intentSlot.name] = {
                 name: intentSlot.name,
@@ -288,13 +287,18 @@ export class SkillRequest {
      * @param confirmationStatus
      */
     public slot(slotName: string, slotValue: string, confirmationStatus = ConfirmationStatus.NONE): SkillRequest {
-        const slots = this.context.interactionModel.intentSchema.slots(this.json.request.intent.name);
+        const slots: any[] = this.context.interactionModel.intents
+            .find(o => o.intent === this.json.request.intent.name)?.slots;
         if (!slots) {
             throw new Error("Trying to add slot to intent that does not have any slots defined");
         }
 
-        const slotValueObject = new SlotValue(slotName, slotValue, confirmationStatus);
-        const slot = slots?.find(s => slotName.toLowerCase() === s.name.toLowerCase()) || undefined;
+        const slotValueObject: any = {
+            name: slotName,
+            value: slotValue,
+            confirmationStatus
+        };
+        const slot = slots?.find(s => slotName.toLowerCase() === s.name.toLowerCase());
         if (!slot) {
             throw new Error("Trying to add undefined slot to intent: " + slotName);
         }
@@ -304,12 +308,11 @@ export class SkillRequest {
         // We only include the entity resolution for builtin types if they have been extended
         //  and for all custom slot types
         if (slotType && (!slotType.name.startsWith("AMAZON") || slotType.values.some(value => !value.builtin))) {
-            // slotValueObject.setEntityResolution(this.context.applicationID(), slotType);
             const authority = `amzn1.er-authority.echo-sdk.${this.context.applicationID()}.${slotType.name}`;
 
-            const value = slotValueObject.value.trim();
+            const value = slotValue.trim();
             const matches: SlotMatch[] = [];
-            for (const slotValue of slotType.values) {
+            for (const slotValue of slotType.values || []) {
                 if (!slotValue.builtin) {
                     // First check the name value - the value and the synonyms are both valid matches
                     // Refer here for definitive rules:
@@ -325,16 +328,22 @@ export class SkillRequest {
                 }
             }
 
-            if (!slotValueObject.resolutionsPerAuthority)
-                slotValueObject.resolutionsPerAuthority = [];
+            const resolutionsPerAuthority: {
+                values: EntityResolutionValue[];
+                status: {
+                    code: EntityResolutionStatus
+                };
+                authority: string;
+            }[] = [];
             // If this is not a builtin value, we add the entity resolution
             if (!matches.length) {
-                this.addEntityResolution(slotValueObject.resolutionsPerAuthority, authority);
+                this.addEntityResolution(resolutionsPerAuthority, authority);
             } else {
                 // Possible to have multiple matches, where we have overlapping synonyms
-                matches.forEach(match => this.addEntityResolution(slotValueObject.resolutionsPerAuthority, authority,
+                matches.forEach(match => this.addEntityResolution(resolutionsPerAuthority, authority,
                     [{ value: { id: match.enumeratedValue.id, name: match.enumeratedValue.name.value } }]));
             }
+            slotValueObject.resolutionsPerAuthority = resolutionsPerAuthority;
         }
         this.json.request.intent.slots[slotName] = slotValueObject;
 
@@ -418,4 +427,18 @@ export class SkillRequest {
             resolutionsPerAuthority.push({ authority, values, status: { code } });
         }
     }
+}
+
+interface EntityResolutionValue {
+    value: {
+        id: string,
+        name: string
+    }
+}
+
+enum EntityResolutionStatus {
+    ER_SUCCESS_MATCH = "ER_SUCCESS_MATCH",
+    ER_SUCCESS_NO_MATCH = "ER_SUCCESS_NO_MATCH",
+    // ER_ERROR_TIMEOUT = "ER_ERROR_TIMEOUT",
+    // ER_ERROR_EXCEPTION = "ER_ERROR_EXCEPTION",
 }

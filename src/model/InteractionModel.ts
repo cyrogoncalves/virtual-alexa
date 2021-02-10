@@ -1,5 +1,36 @@
 import { AudioBuiltinIntents } from "../audioPlayer/AudioPlayer";
-import { ConfirmationStatus } from '../core/SkillContext';
+
+const LONG_FORM_VALUES: {[id: string]: string []} = {
+    1: ["one"],
+    2: ["two"],
+    3: ["three"],
+    4: ["four"],
+    5: ["five"],
+    6: ["six"],
+    7: ["seven"],
+    8: ["eight"],
+    9: ["nine"],
+    10: ["ten"],
+    11: ["eleven"],
+    12: ["twelve"],
+    13: ["thirteen"],
+    14: ["fourteen"],
+    15: ["fifteen"],
+    16: ["sixteen"],
+    17: ["seventeen"],
+    18: ["eighteen"],
+    19: ["nineteen"],
+    20: ["twenty"],
+};
+
+const LONG_FORM_SLOT_VALUES: ISlotValue[] = Object.entries(LONG_FORM_VALUES).map(([value, synonyms]) => ({
+    id: value,
+    builtin: true,
+    name: {
+        value,
+        synonyms
+    }
+}));
 
 /**
  * Parses and interprets an interaction model
@@ -7,82 +38,13 @@ import { ConfirmationStatus } from '../core/SkillContext';
  * Then can take a phrase and create an intentName request based on it
  */
 export class InteractionModel {
-    // Parse the all-in-one interaction model as JSON
-    // Using this for reference:
-    //  https://github.com/alexa/skill-sample-nodejs-team-lookup/blob/master/speech-assets/interaction-model.json
-    public static fromJSON(interactionModel: any): InteractionModel {
-        // For the official interaction model that is part of SMAPI,
-        //  we pull the data off of the interactionModel.languageModel element
-        const model = interactionModel.interactionModel || interactionModel;
-
-        let languageModel = interactionModel.interactionModel?.languageModel || interactionModel;
-        // There is another version of the model from the interaction model builder
-        if ("languageModel" in interactionModel) {
-            languageModel = interactionModel.languageModel;
-        }
-
-        const sampleJSON: any = {};
-        for (const intent of languageModel.intents) {
-            // The name of the intent is on the property "name" instead of "intent" for the unified model
-            intent.intent = intent.name;
-            if (intent.samples) {
-                sampleJSON[intent.intent] = intent.samples;
-            }
-        }
-
-        const schema = new IntentSchema(languageModel.intents);
-        return new InteractionModel(schema, sampleJSON, languageModel.types || [], model.prompts ?? [], model.dialog?.intents);
-    }
-
-    private static LONG_FORM_VALUES: {[id: string]: string []} = {
-        1: ["one"],
-        2: ["two"],
-        3: ["three"],
-        4: ["four"],
-        5: ["five"],
-        6: ["six"],
-        7: ["seven"],
-        8: ["eight"],
-        9: ["nine"],
-        10: ["ten"],
-        11: ["eleven"],
-        12: ["twelve"],
-        13: ["thirteen"],
-        14: ["fourteen"],
-        15: ["fifteen"],
-        16: ["sixteen"],
-        17: ["seventeen"],
-        18: ["eighteen"],
-        19: ["nineteen"],
-        20: ["twenty"],
-    };
-
-    private static LONG_FORM_SLOT_VALUES(): ISlotValue[] {
-        return Object.keys(InteractionModel.LONG_FORM_VALUES).map(key => ({
-            id: key,
-            builtin: true,
-            name: {
-                value: key,
-                synonyms: InteractionModel.LONG_FORM_VALUES[key]
-            }
-        }));
-    }
-
-    public readonly slotTypes?: SlotType[];
-
-    public constructor(public intentSchema: IntentSchema,
+    public constructor(public intents: any[],
                        private sampleUtterances: { [intent: string]: string[] },
-                       slotTypesObj: any[] = [],
-                       public prompts?: SlotPrompt[],
-                       public dialogIntents?: DialogIntent[]) {
-        this.slotTypes = [
-            ...slotTypesObj.map(type => new SlotType(type.name, type.values)),
-            new SlotType("AMAZON.NUMBER", InteractionModel.LONG_FORM_SLOT_VALUES(), "^[0-9]*$")
-        ];
-
+                       public readonly slotTypes: SlotType[] = [],
+                       private dialogIntents?: DialogIntent[]) {
         // We add each phrase one-by-one. It is possible the built-ins have additional samples defined
         for (const [key, phrases] of Object.entries(AudioBuiltinIntents)) {
-            if (this.intentSchema.intents.some(o => o.intent === key)) {
+            if (this.intents.some(o => o.intent === key)) {
                 for (const phrase of phrases) {
                     if (!sampleUtterances[key])
                         sampleUtterances[key] = [];
@@ -94,9 +56,7 @@ export class InteractionModel {
 
     public utterance(utterance: string) {
         let topMatch: any;
-        let topScore = 0;
-        let topScoreSlot = 0;
-        for (const intent of this.intentSchema.intents.map(intentJSON => intentJSON.intent)) {
+        for (const intent of this.intents.map(intentJSON => intentJSON.intent)) {
             for (const sample of this.sampleUtterances[intent] || []) {
                 // Takes a phrase like "This is a {Slot}" and turns it into a regex like "This is a(.*)".
                 // This is so we can compare the sample utterances
@@ -123,15 +83,15 @@ export class InteractionModel {
 
                 const score = matchArray[0].length - slotMatches.reduce((length, slotMatch) => length + slotMatch.value.length, 0);
                 const scoreSlot = slotMatches.filter(slotMatch => !slotMatch.untyped).length;
-                if (!topMatch || score > topScore || topScore === score && scoreSlot > topScoreSlot) {
+                if (!topMatch || score > topMatch.score || topMatch.score === score && scoreSlot > topMatch.scoreSlot) {
                     topMatch = {
                         matchedSample: sample,
                         slots: slotMatches.map(slotMatch => slotMatch.value),
                         intent,
-                        slotNames
+                        slotNames,
+                        score,
+                        scoreSlot
                     };
-                    topScore = score;
-                    topScoreSlot = scoreSlot;
                 }
             }
         }
@@ -146,10 +106,6 @@ export class InteractionModel {
         return this.dialogIntents?.find(dialogIntent => dialogIntent.name === intentName) || undefined;
     }
 
-    public prompt(id: string): SlotPrompt | undefined {
-        return this.prompts?.find(prompt => prompt.id === id) || undefined;
-    }
-
     private checkSlots(intent: string, slotNames: string[], slotValues: string[]): SlotMatch[] | undefined {
         // Build an array of results - we want to pass back the exact value that matched (not change the case)
         const result: SlotMatch[] = [];
@@ -158,14 +114,17 @@ export class InteractionModel {
         for (const slotValue of slotValues) {
             const slotName = slotNames[index++];
             // Look up the slot type for the name
-            const slot = this.intentSchema.intents.find(o => o.intent === intent)?.slots
+            const slot = this.intents.find(o => o.intent === intent)?.slots
                 ?.find((slot: any) => slotName.toLowerCase() === slot.name.toLowerCase());
             if (!slot) {
                 throw new Error(`Invalid schema - not slot: ${slotName} for intent: ${intent}`);
             }
 
             // If no slot type definition is provided, we just assume it is a match
-            const slotType = this.slotTypes.find(o => o.name.toLowerCase() === slot.type.toLowerCase());
+            const slotType = [
+                ...this.slotTypes,
+                { name: "AMAZON.NUMBER", values: LONG_FORM_SLOT_VALUES, regex: "^[0-9]*$" }
+            ].find(o => o.name.toLowerCase() === slot.type.toLowerCase());
             const slotMatch = this.matchSlot(slotType, slotValue);
             if (!slotMatch) {
                 return undefined;
@@ -177,16 +136,16 @@ export class InteractionModel {
     }
 
     private matchSlot(slotType: SlotType, slotValue: string): SlotMatch {
+        const slotValueTrimmed = slotValue.trim();
         if (!slotType) {
             const match = new SlotMatch(slotValue);
             match.untyped = true;
             return match;
-        } else if (slotType.regex && slotValue.trim().match(slotType.regex)) {
+        } else if (slotType.regex && slotValueTrimmed.match(slotType.regex)) {
             // Some slot types use regex - we use that if specified
-            return new SlotMatch(slotValue.trim());
+            return new SlotMatch(slotValueTrimmed);
         } else {
-            const slotValueTrimmed = slotValue.trim();
-            const match = slotType.values.find(v => v.name.value.toLowerCase() === slotValueTrimmed.toLowerCase()
+            const match = slotType.values?.find(v => v.name.value.toLowerCase() === slotValueTrimmed.toLowerCase()
                 || v.name.synonyms?.some(synonym => synonym.toLowerCase() === slotValueTrimmed.toLowerCase()));
             if (match) {
                 return new SlotMatch(slotValueTrimmed, match);
@@ -198,52 +157,6 @@ export class InteractionModel {
         }
         return undefined;
     }
-}
-
-export class IntentSchema {
-    public constructor(public intents: any[]) {}
-
-    public slots(intentName: string): any[] {
-        return this.intents.find(o => o.intent === intentName)?.slots;
-    }
-}
-
-interface SlotPrompt {
-    id: string;
-    variations: {
-        type: string;
-        value: string;
-    }[];
-}
-
-export class SlotValue {
-    public resolutionsPerAuthority: {
-        values: EntityResolutionValue[];
-        status: {
-            code: EntityResolutionStatus
-        };
-        authority: string;
-    }[];
-
-    public constructor(
-        public name: string,
-        public value: string,
-        public confirmationStatus = ConfirmationStatus.NONE
-    ) {}
-}
-
-export interface EntityResolutionValue {
-    value: {
-        id: string,
-        name: string
-    }
-}
-
-export enum EntityResolutionStatus {
-    ER_SUCCESS_MATCH = "ER_SUCCESS_MATCH",
-    ER_SUCCESS_NO_MATCH = "ER_SUCCESS_NO_MATCH",
-    // ER_ERROR_TIMEOUT = "ER_ERROR_TIMEOUT",
-    // ER_ERROR_EXCEPTION = "ER_ERROR_EXCEPTION",
 }
 
 interface DialogIntent {
@@ -266,8 +179,10 @@ export class SlotMatch {
     }
 }
 
-export class SlotType {
-    public constructor(public name: string, public values: ISlotValue[] = [], public regex?: string) {}
+export interface SlotType {
+    name: string,
+    values: ISlotValue[],
+    regex?: string
 }
 
 interface ISlotValue {

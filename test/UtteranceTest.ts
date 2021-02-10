@@ -1,58 +1,55 @@
 import { assert } from "chai";
-import { IntentSchema, InteractionModel, SlotType } from "../src/model/InteractionModel";
+import { InteractionModel, SlotType } from "../src/model/InteractionModel";
 import { VirtualAlexa } from '../src';
-import * as fs from "fs";
 
 describe("UtteranceTest", function() {
     this.timeout(10000);
 
-    const intentSchema = {
-        intents: [
-            {
-                intent: "Play",
-            },
-            {
-                intent: "Hello",
-            },
-            {
-                intent: "NoSampleUtterances",
-            },
-            {
-                intent: "SlottedIntent",
-                slots: [
-                    {name: "SlotName", type: "SLOT_TYPE"},
-                ],
-            },
-            {
-                intent: "MultipleSlots",
-                slots: [
-                    {name: "SlotA", type: "SLOT_TYPE"},
-                    {name: "SlotB", type: "SLOT_TYPE"},
-                ],
-            },
-            {
-                intent: "CustomSlot",
-                slots: [
-                    {name: "country", type: "COUNTRY_CODE"},
-                ],
-            },
-            {
-                intent: "NumberSlot",
-                slots: [
-                    {name: "number", type: "AMAZON.NUMBER"},
-                ],
-            },
-            {
-                intent: "StringSlot",
-                slots: [
-                    {name: "stringSlot", type: "StringSlotType"},
-                ],
-            },
-            {
-                intent: "AMAZON.HelpIntent",
-            },
-        ],
-    };
+    const intents = [
+        {
+            intent: "Play",
+        },
+        {
+            intent: "Hello",
+        },
+        {
+            intent: "NoSampleUtterances",
+        },
+        {
+            intent: "SlottedIntent",
+            slots: [
+                {name: "SlotName", type: "SLOT_TYPE"},
+            ],
+        },
+        {
+            intent: "MultipleSlots",
+            slots: [
+                {name: "SlotA", type: "SLOT_TYPE"},
+                {name: "SlotB", type: "SLOT_TYPE"},
+            ],
+        },
+        {
+            intent: "CustomSlot",
+            slots: [
+                {name: "country", type: "COUNTRY_CODE"},
+            ],
+        },
+        {
+            intent: "NumberSlot",
+            slots: [
+                {name: "number", type: "AMAZON.NUMBER"},
+            ],
+        },
+        {
+            intent: "StringSlot",
+            slots: [
+                {name: "stringSlot", type: "StringSlotType"},
+            ],
+        },
+        {
+            intent: "AMAZON.HelpIntent",
+        },
+    ];
 
     const sampleUtterances = {
         CustomSlot: ["{country}"],
@@ -91,7 +88,7 @@ describe("UtteranceTest", function() {
         ],
     }] as SlotType[];
 
-    const model = new InteractionModel(new IntentSchema(intentSchema.intents), sampleUtterances, slotTypes);
+    const model = new InteractionModel(intents, sampleUtterances, slotTypes);
 
     const slotIndex = (slotNames: string[], name: string): number => {
       return slotNames.findIndex(slotName => slotName.toLowerCase() === name.toLowerCase());
@@ -216,20 +213,22 @@ describe("UtteranceTest", function() {
         });
 
         describe("Matches for International Languages", function() {
-            const data = fs.readFileSync("./test/resources/japanese_skill/models/ja-JP.json");
-            const json = JSON.parse(data.toString());
-            const japaneseModel = InteractionModel.fromJSON(json)
+            const virtualAlexa = VirtualAlexa.Builder()
+                    .handler("test/resources/index.handler")
+                    .interactionModelFile("./test/resources/japanese_skill/models/ja-JP.json")
+                    .create();
 
-            it("Matches a slotted phrase", () => {
-                const { slotNames, slots, intent } = japaneseModel.utterance("5 人のプレーヤー");
-                assert.equal(intent, "GetIntentWithSlot");
-                assert.equal(slots?.[0]?.trim(), "5");
-                assert.equal(slots?.[slotIndex(slotNames, "number")]?.trim(), "5");
+            it("Matches a slotted phrase", async () => {
+                await virtualAlexa.filter(request => {
+                    assert.equal(request.request.intent.name, "GetIntentWithSlot");
+                    assert.equal(request.request.intent.slots["number"].value, "5");
+                }).utter("5 人のプレーヤー");
             });
 
-            it("Matches a slotted phrase, no slot value", () => {
-                const { intent } = japaneseModel.utterance("おはよう");
-                assert.equal(intent, "GetIntent");
+            it("Matches a slotted phrase, no slot value", async () => {
+                await virtualAlexa.filter(request => {
+                    assert.equal(request.request.intent.name, "GetIntent");
+                }).utter("おはよう");
             });
         });
     });
