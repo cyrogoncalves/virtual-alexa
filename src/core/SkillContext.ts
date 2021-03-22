@@ -11,32 +11,23 @@ import {InteractionModel} from "../model/InteractionModel";
  */
 export class SkillContext {
     accessToken: string;
-    public readonly apiAccessToken: string;
-    public readonly apiEndpoint: string;
-    public readonly device: Device;
+    public readonly apiAccessToken = "virtualAlexa.accessToken." + uuid.v4();
+    public readonly apiEndpoint = "https://api.amazonalexa.com";
+    public readonly device = new Device();
     /** @internal */
-    public readonly dialogManager: DialogManager;
-    public readonly userId: string;
-    private _session: SkillSession;
+    public readonly dialogManager = new DialogManager();
+    public readonly userId = "amzn1.ask.account." + uuid.v4();
+    private _session = new SkillSession();
 
     /** @internal */
     public constructor(
         public readonly interactionModel: InteractionModel,
         public readonly audioPlayer: AudioPlayer,
         private _locale: string,
-        private _applicationID?: string,
-    ) {
-        this.apiAccessToken = "virtualAlexa.accessToken." + uuid.v4();
-        this.apiEndpoint = "https://api.amazonalexa.com";
-        this.dialogManager = new DialogManager();
-        this.device = new Device();
-        this.userId = "amzn1.ask.account." + uuid.v4();
-        this._session = new SkillSession();
-    }
+        private _applicationID: string = "amzn1.echo-sdk-ams.app." + uuid.v4()
+    ) {}
 
     public applicationID(): string {
-        if (!this._applicationID) // Generate an application ID if it is not set
-            this._applicationID = "amzn1.echo-sdk-ams.app." + uuid.v4();
         return this._applicationID;
     }
 
@@ -122,35 +113,30 @@ export enum DialogState {
 export class DialogManager {
     private _confirmationStatus: ConfirmationStatus;
     private _dialogState: DialogState;
-    private _slots: {[id: string]: any} = {};
+    private _slots: {[id: string]: {
+        value: string,
+        resolutions: string,
+        confirmationStatus: string,
+    }} = {};
 
     /** @internal */
-    public handleDirective(directives: any, context: SkillContext): void {
-        // Look for a dialog directive - trigger dialog mode if so
-        for (const directive of directives) {
-            if (directive.type.startsWith("Dialog")) {
-                if (directive.updatedIntent && !context.interactionModel.dialogIntent(directive.updatedIntent.name)) {
-                    throw new Error("No match for dialog name: " + directive.updatedIntent.name);
-                }
+    public handleDirective(directive: any): void {
+        this._dialogState = this._dialogState ? DialogState.IN_PROGRESS : DialogState.STARTED;
 
-                this._dialogState = this._dialogState ? DialogState.IN_PROGRESS : DialogState.STARTED;
+        if (directive.type === "Dialog.Delegate") {
+            this._confirmationStatus = ConfirmationStatus.NONE;
+        } else if (["Dialog.ElicitSlot", "Dialog.ConfirmSlot", "Dialog.ConfirmIntent"].includes(directive.type)) {
+            // Start the dialog if not started, otherwise mark as in progress
+            if (!this._confirmationStatus) {
+                this._confirmationStatus = ConfirmationStatus.NONE;
+            }
 
-                if (directive.type === "Dialog.Delegate") {
-                    this._confirmationStatus = ConfirmationStatus.NONE;
-                } else if (["Dialog.ElicitSlot", "Dialog.ConfirmSlot", "Dialog.ConfirmIntent"].includes(directive.type)) {
-                    // Start the dialog if not started, otherwise mark as in progress
-                    if (!this._confirmationStatus) {
-                        this._confirmationStatus = ConfirmationStatus.NONE;
-                    }
+            if (directive.updatedIntent) {
+                this.updateSlotStates(directive.updatedIntent.slots);
+            }
 
-                    if (directive.updatedIntent) {
-                        this.updateSlotStates(directive.updatedIntent.slots);
-                    }
-
-                    if (directive.type === "Dialog.ConfirmIntent") {
-                        this._dialogState = DialogState.COMPLETED;
-                    }
-                }
+            if (directive.type === "Dialog.ConfirmIntent") {
+                this._dialogState = DialogState.COMPLETED;
             }
         }
     }

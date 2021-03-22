@@ -387,7 +387,15 @@ export class SkillRequest {
         if (result.response?.directives) {
             await this.context.audioPlayer.directivesReceived(result.response.directives);
             // Update the dialog manager based on the results
-            this.context.dialogManager.handleDirective(result.response.directives, this.context);
+            // Look for a dialog directive - trigger dialog mode if so
+            for (const directive of result.response.directives) {
+                if (directive.type.startsWith("Dialog")) {
+                    if (directive.updatedIntent && !this.context.interactionModel.dialogIntent(directive.updatedIntent.name)) {
+                        throw new Error("No match for dialog name: " + directive.updatedIntent.name);
+                    }
+                    this.context.dialogManager.handleDirective(directive);
+                }
+            }
         }
 
         // Resume the audio player, if suspended

@@ -1,5 +1,3 @@
-import * as _ from "lodash";
-
 /**
  * Wrapper object for the Alexa Response.
  *
@@ -22,7 +20,7 @@ export class SkillResponse {
      * @returns {string}
      */
     public attr(key: string): string {
-        return _.get(this.sessionAttributes, key);
+        return this.sessionAttributes?.[key];
     }
 
     /**
@@ -31,31 +29,31 @@ export class SkillResponse {
      * @returns {any}
      */
     public attrs(...keys: string []): any {
-        return _.pick(this.sessionAttributes, keys);
+        return this.sessionAttributes;
     }
 
     public card(): any | undefined {
-        return _.get(this, "response.card");
+        return this.response?.card;
     }
 
     public cardContent(): string | undefined {
-        return _.get(this, "response.card.content");
+        return this.response?.card?.content;
     }
 
     public cardImage(): any {
-        return _.get(this, "response.card.image");
+        return this.response?.card?.image;
     }
 
     public cardSmallImage(): string | undefined {
-        return _.get(this, "response.card.image.smallImageUrl");
+        return this.response?.card?.image.smallImageUrl;
     }
 
     public cardLargeImage(): string | undefined {
-        return _.get(this, "response.card.image.largeImageUrl");
+        return this.response?.card?.image.largeImageUrl;
     }
 
     public cardTitle(): string | undefined {
-        return _.get(this, "response.card.title");
+        return this.response?.card?.title;
     }
 
     public directive(type: string): any {
@@ -63,7 +61,7 @@ export class SkillResponse {
     }
 
     public display(): any {
-        return _.get(this.directive("Display.RenderTemplate"), "template");
+        return this.directive("Display.RenderTemplate")?.template;
     }
 
     /**
@@ -97,15 +95,11 @@ export class SkillResponse {
     }
 
     public prompt(): string | undefined {
-        return _.has(this, "response.outputSpeech.ssml")
-            ? _.get(this, "response.outputSpeech.ssml")
-            : _.get(this, "response.outputSpeech.text");
+        return this.response?.outputSpeech?.ssml ?? this.response?.outputSpeech?.text;
     }
 
     public reprompt(): string {
-        return _.has(this, "response.reprompt.outputSpeech.ssml")
-            ? _.get(this, "response.reprompt.outputSpeech.ssml")
-            : _.get(this, "response.reprompt.outputSpeech.text");
+        return this.response?.reprompt?.outputSpeech?.ssml ?? this.response?.reprompt?.outputSpeech?.text;
     }
 
     private displayText(textElement: string, listItemToken?: string): string | undefined {
@@ -117,11 +111,11 @@ export class SkillResponse {
         if (listItemToken) {
             for (const listItem of displayTemplate.listItems) {
                 if (listItem.token === listItemToken) {
-                    return _.get(listItem, "textContent." + textElement + ".text");
+                    return listItem.textContent?.[textElement]?.text;
                 }
             }
         } else {
-            return _.get(displayTemplate, "textContent." + textElement + ".text");
+            return displayTemplate.textContent?.[textElement]?.text;
         }
         return undefined;
     }
