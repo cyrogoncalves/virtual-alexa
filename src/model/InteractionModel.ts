@@ -38,20 +38,19 @@ const LONG_FORM_SLOT_VALUES: ISlotValue[] = Object.entries(LONG_FORM_VALUES).map
  * Then can take a phrase and create an intentName request based on it
  */
 export class InteractionModel {
-    public constructor(public intents: any[],
-                       private sampleUtterances: { [intent: string]: string[] },
-                       public readonly slotTypes: SlotType[] = [],
-                       private dialogIntents?: DialogIntent[]) {
+    public constructor(
+        public intents: any[],
+        private sampleUtterances: { [intent: string]: string[] },
+        public readonly slotTypes: SlotType[] = []
+    ) {
         // We add each phrase one-by-one. It is possible the built-ins have additional samples defined
-        for (const [key, phrases] of Object.entries(AudioBuiltinIntents)) {
-            if (this.intents.some(o => o.intent === key)) {
-                for (const phrase of phrases) {
-                    if (!sampleUtterances[key])
-                        sampleUtterances[key] = [];
-                    sampleUtterances[key].push(phrase);
-                }
-            }
-        }
+        Object.entries(AudioBuiltinIntents)
+            .filter(([k]) => this.intents.some(o => o.intent === k))
+            .forEach(([key, phrases]) => {
+                if (!sampleUtterances[key])
+                    sampleUtterances[key] = [];
+                sampleUtterances[key].push(...phrases);
+            });
     }
 
     public utterance(utterance: string) {
@@ -102,8 +101,8 @@ export class InteractionModel {
         return topMatch;
     }
 
-    public dialogIntent(intentName: string): DialogIntent | undefined {
-        return this.dialogIntents?.find(dialogIntent => dialogIntent.name === intentName) || undefined;
+    public dialogIntent(intentName: string): DialogIntent {
+        return this.intents?.find(dialogIntent => dialogIntent.name === intentName);
     }
 
     private checkSlots(intent: string, slotNames: string[], slotValues: string[]): SlotMatch[] | undefined {

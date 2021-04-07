@@ -47,10 +47,11 @@ describe("AudioPlayer launches and plays a track", function() {
                 requests.push(json.request);
             });
 
-            await virtualAlexa.launch();
+            const skillRequest = virtualAlexa.request();
+            await skillRequest.launch().send();
             const reply = await virtualAlexa.utter("play") as SkillResponse;
             assert.include(reply.response.directives[0].audioItem.stream.url, "episode-013");
-            assert.isTrue(virtualAlexa.context.audioPlayer.isPlaying());
+            assert.isTrue(skillRequest.audioPlayer0.isPlaying());
         } catch (e) {
             console.log(e);
         }

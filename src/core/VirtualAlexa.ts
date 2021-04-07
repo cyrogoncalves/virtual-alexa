@@ -3,11 +3,12 @@ import { AddressAPI } from "../external/AddressAPI";
 import { DynamoDB } from "../external/DynamoDB";
 import { SkillInteractor } from "../interactor";
 import { InteractionModel } from "../model/InteractionModel";
-import { SkillContext } from "./SkillContext";
+import { Device, DialogManager, SkillSession } from "./SkillContext";
 import { SessionEndedReason, SkillRequest } from "./SkillRequest";
 import { SkillResponse } from "./SkillResponse";
 import { UserAPI } from "../external/UserAPI";
 import { VirtualAlexaBuilder } from '../builder';
+import * as uuid from 'uuid';
 
 export class VirtualAlexa {
     public static Builder = () => new VirtualAlexaBuilder();
@@ -15,21 +16,37 @@ export class VirtualAlexa {
     private requestFilter: (request: any) => void;
     public readonly addressAPI: AddressAPI;
     public readonly userAPI: UserAPI;
-    public readonly context: SkillContext;
     public readonly dynamoDB: DynamoDB;
+    private readonly audioPlayer : AudioPlayer;
+
+    accessToken: string;
+    public readonly apiAccessToken = "virtualAlexa.accessToken." + uuid.v4();
+    public readonly apiEndpoint = "https://api.amazonalexa.com";
+    public readonly device = new Device();
+    /** @internal */
+    public readonly dialogManager = new DialogManager();
+    public readonly userId = "amzn1.ask.account." + uuid.v4();
+
+    session: SkillSession;
+    public newSession(): void {
+        this.session = new SkillSession();
+    }
+    public endSession2(): void {
+        this.dialogManager.reset();
+        this.session = undefined;
+    }
     
     /** @internal */
     public constructor(
         /** @internal */
         private readonly _interactor: SkillInteractor,
-        model: InteractionModel,
-        locale: string,
-        applicationID?: string
+        private readonly model: InteractionModel,
+        private readonly locale: string,
+        private readonly applicationID: string = "amzn1.echo-sdk-ams.app." + uuid.v4()
     ) {
-        const audioPlayer = new AudioPlayer(this);
-        this.context = new SkillContext(model, audioPlayer, locale, applicationID);
-        this.addressAPI = new AddressAPI(this.context);
-        this.userAPI = new UserAPI(this.context);
+        this.audioPlayer = new AudioPlayer(this);
+        this.addressAPI = new AddressAPI(this.apiEndpoint, this.device);
+        this.userAPI = new UserAPI(this.apiEndpoint);
         this.dynamoDB = new DynamoDB();
     }
 
@@ -74,7 +91,10 @@ export class VirtualAlexa {
      * Useful for highly customized JSON requests
      */
     public request(): SkillRequest {
-        return new SkillRequest(this.context, this._interactor, this.requestFilter);
+        return new SkillRequest(this.model, this._interactor, this.requestFilter,
+            this.locale, this.applicationID, this.audioPlayer, this.device, this.userId, this.accessToken,
+            this.apiAccessToken, this.apiEndpoint, this.dialogManager,
+            this);
     }
     
     /**
@@ -113,7 +133,7 @@ export class VirtualAlexa {
             resolvedUtterance = result[1];
         }
 
-        const { slots, intent, slotNames } = this.context.interactionModel.utterance(resolvedUtterance);
+        const { slots, intent, slotNames } = this.model.utterance(resolvedUtterance);
         const json = slots?.reduce((json: any, slot: string, i: number) => {
             json[slotNames[i]] = slot.trim();
             return json;

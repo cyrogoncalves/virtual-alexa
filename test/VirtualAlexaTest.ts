@@ -17,7 +17,6 @@ describe("VirtualAlexa Tests Using Files", function() {
         const response = await virtualAlexa.utter("play now") as any;
 
         assert.isTrue(response?.success);
-        assert.equal(virtualAlexa.context.locale(), "en-US");
         assert.equal(requestToCheck?.request.locale, "en-US");
     });
 
@@ -31,7 +30,6 @@ describe("VirtualAlexa Tests Using Files", function() {
         const response = await virtualAlexa.utter("play now") as any;
 
         assert.isTrue(response?.success);
-        assert.equal(virtualAlexa.context.locale(), "de-DE");
     });
 
     it("Parses the SMAPI format interaction model and does a simple utterance", async () => {
@@ -484,10 +482,10 @@ describe("VirtualAlexa Tests Using JSON", function() {
 
     describe("#utterWithDeviceInfo", () => {
         it("Utters simple phrase with device info", async () => {
-            virtualAlexa.context.device.id = "testID";
-            virtualAlexa.context.device.audioPlayerSupported(true);
-            virtualAlexa.context.device.displaySupported(true);
-            virtualAlexa.context.device.videoAppSupported(true);
+            virtualAlexa.device.id = "testID";
+            virtualAlexa.device.audioPlayerSupported(true);
+            virtualAlexa.device.displaySupported(true);
+            virtualAlexa.device.videoAppSupported(true);
 
             await virtualAlexa.filter(request => {
                 assert.isDefined(request.context.System.device.deviceId);
@@ -503,8 +501,8 @@ describe("VirtualAlexa Tests Using JSON", function() {
         });
 
         it("Removes audio player capability", async () => {
-            virtualAlexa.context.device.id = "testID";
-            virtualAlexa.context.device.audioPlayerSupported(false);
+            virtualAlexa.device.id = "testID";
+            virtualAlexa.device.audioPlayerSupported(false);
 
             await virtualAlexa.filter(request => {
                 assert.isUndefined(request.context.System.device.supportedInterfaces.AudioPlayer);
@@ -564,7 +562,7 @@ describe("VirtualAlexa Tests Using JSON", function() {
         it("Starts and Is Asked To Stop", async () => {
             await virtualAlexa.launch();
             await virtualAlexa.utter("stop");
-            assert.isUndefined(virtualAlexa.context.session);
+            assert.isUndefined(virtualAlexa.session);
         });
     });
 
@@ -658,9 +656,9 @@ describe("Echo Show Tests", () => {
         .intentSchemaFile("./test/resources/IntentSchema.json",
             "./test/resources/SampleUtterances.txt")
         .create();
-    virtualAlexa.context.device.id = "testID";
-    virtualAlexa.context.device.audioPlayerSupported(false);
-    virtualAlexa.context.device.displaySupported(true);
+    virtualAlexa.device.id = "testID";
+    virtualAlexa.device.audioPlayerSupported(false);
+    virtualAlexa.device.displaySupported(true);
 
     it("Gets echo display stuff from response", async () => {
         const response = await virtualAlexa.utter("play now");

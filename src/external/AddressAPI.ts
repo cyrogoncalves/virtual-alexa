@@ -1,12 +1,12 @@
 import * as nock from "nock";
-import {SkillContext} from "../core/SkillContext";
+import { Device } from "../core/SkillContext";
 
 export class AddressAPI {
     /** @internal */
     private static addressScope: nock.Scope; // We keep the nock scope as a singleton - only one can be active at a time
     /** @internal */
     private static postalScope: nock.Scope; // We keep the nock scope as a singleton - only one can be active at a time
-    public constructor(private context: SkillContext) {
+    public constructor(private apiEndpoint: string, private device: Device) {
         this.reset();
     }
 
@@ -58,15 +58,14 @@ export class AddressAPI {
 
         // If the address API is configured, we set the device ID if one is not already set
         if (payload) {
-            this.context.device.generatedID();
+            this.device.generatedID();
         }
 
-        const baseURL = this.context.apiEndpoint;
         // For some reason, in testing this, the get only works if it is function
         // Does not work, for certain scenarios, if it is just a string
-        const scope = nock(baseURL)
+        const scope = nock(this.apiEndpoint)
             .persist()
-            .get(path => path === `/v1/devices/${this.context.device.id}${pathEnd}`)
+            .get(path => path === `/v1/devices/${this.device.id}${pathEnd}`)
             .query(true)
             .reply(responseCode, JSON.stringify(payload, null, 2));
         if (pathEnd.endsWith("countryAndPostalCode")) {

@@ -46,15 +46,13 @@ export class VirtualAlexaBuilder {
     //  https://github.com/alexa/skill-sample-nodejs-team-lookup/blob/master/speech-assets/interaction-model.json
     // For the official interaction model that is part of SMAPI,
     //  we pull the data off of the interactionModel.languageModel element
-    const model = json.interactionModel || json;
-
     let languageModel = json.languageModel || json.interactionModel?.languageModel || json;
     // The name of the intent is on the property "name" instead of "intent" for the unified model
     languageModel.intents.forEach((intent: any) => intent.intent = intent.name);
     const sampleJSON: any = {};
     languageModel.intents.forEach((intent: any) => sampleJSON[intent.name] = intent.samples);
 
-    this._model = new InteractionModel(languageModel.intents, sampleJSON, languageModel.types || [], model.dialog?.intents);
+    this._model = new InteractionModel(languageModel.intents, sampleJSON, languageModel.types || []);
     return this;
   }
 

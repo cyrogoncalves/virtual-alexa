@@ -1,11 +1,10 @@
 import * as nock from "nock";
-import { SkillContext } from "../core/SkillContext";
 
 export class UserAPI {
     /** @internal */
     private static scope: nock.Scope; // We keep the nock scope as a singleton - only one can be active at a time
 
-    public constructor(private context: SkillContext) {
+    public constructor(private apiEndpoint: string) {
         this.reset();
     }
 
@@ -24,7 +23,7 @@ export class UserAPI {
             nock.activate();
         }
 
-        let scope = nock(this.context.apiEndpoint).persist();
+        let scope = nock(this.apiEndpoint).persist();
 
         // Alexa User Profile possible paths
         // Full Name	/v2/accounts/~current/settings/Profile.name
