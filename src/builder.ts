@@ -48,20 +48,11 @@ export class VirtualAlexaBuilder {
     //  we pull the data off of the interactionModel.languageModel element
     const model = json.interactionModel || json;
 
-    let languageModel = json.interactionModel?.languageModel || json;
-    // There is another version of the model from the interaction model builder
-    if ("languageModel" in json) {
-      languageModel = json.languageModel;
-    }
-
+    let languageModel = json.languageModel || json.interactionModel?.languageModel || json;
+    // The name of the intent is on the property "name" instead of "intent" for the unified model
+    languageModel.intents.forEach((intent: any) => intent.intent = intent.name);
     const sampleJSON: any = {};
-    for (const intent of languageModel.intents) {
-      // The name of the intent is on the property "name" instead of "intent" for the unified model
-      intent.intent = intent.name;
-      if (intent.samples) {
-        sampleJSON[intent.name] = intent.samples;
-      }
-    }
+    languageModel.intents.forEach((intent: any) => sampleJSON[intent.name] = intent.samples);
 
     this._model = new InteractionModel(languageModel.intents, sampleJSON, languageModel.types || [], model.dialog?.intents);
     return this;

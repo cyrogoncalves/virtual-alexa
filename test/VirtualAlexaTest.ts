@@ -3,37 +3,17 @@ import {SkillResponse} from "../src/core/SkillResponse";
 import {VirtualAlexa} from "../src/core/VirtualAlexa";
 
 describe("VirtualAlexa Tests Using Files", function() {
-    it("Parses the files and does a simple utterance", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("./test/resources/index.handler")
-            .intentSchemaFile("./test/resources/IntentSchema.json",
-                "./test/resources/SampleUtterances.txt")
-            .create();
+    beforeEach(() => process.chdir("test/resources"));
 
-        let requestToCheck: any;
-        assert(virtualAlexa.filter((request) => {
-            requestToCheck = request;
-        }));
-
-        const response = await virtualAlexa.utter("play now") as any;
-
-        assert.isTrue(response?.success);
-        assert.equal(virtualAlexa.context.locale(), "en-US");
-        assert.equal(requestToCheck?.request.locale, "en-US");
-    });
+    afterEach(() => process.chdir("../.."));
 
     it("Parses lambda file with parent directory path", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("./test/resources/index.handler")
-            .intentSchemaFile("./test/resources/IntentSchema.json",
-                "./test/resources/SampleUtterances.txt")
+        const virtualAlexa = VirtualAlexa.Builder().handler("index.handler")
+            .intentSchemaFile("IntentSchema.json", "SampleUtterances.txt")
             .create();
 
         let requestToCheck: any;
-        assert(virtualAlexa.filter((request) => {
-            requestToCheck = request;
-        }));
-
+        virtualAlexa.filter(request => requestToCheck = request);
         const response = await virtualAlexa.utter("play now") as any;
 
         assert.isTrue(response?.success);
@@ -42,10 +22,8 @@ describe("VirtualAlexa Tests Using Files", function() {
     });
 
     it("Parses the files and does a simple utterance in german", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("./test/resources/index.js")
-            .intentSchemaFile("./test/resources/IntentSchema.json",
-                "./test/resources/SampleUtterances.txt")
+        const virtualAlexa = VirtualAlexa.Builder().handler("index.js")
+            .intentSchemaFile("IntentSchema.json", "SampleUtterances.txt")
             .locale("de-DE")
             .create();
 
@@ -57,51 +35,42 @@ describe("VirtualAlexa Tests Using Files", function() {
     });
 
     it("Parses the SMAPI format interaction model and does a simple utterance", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModelFile("./test/resources/InteractionModelSMAPI.json")
+        const virtualAlexa = VirtualAlexa.Builder().handler("index.handler")
+            .interactionModelFile("InteractionModelSMAPI.json")
             .create();
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "TellMeMoreIntent");
         }).utter("contact info");
     });
 
     it("Parses the Interaction Model format V2 and does a simple utterance", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModelFile("./test/resources/LanguageModel.json")
+        const virtualAlexa = VirtualAlexa.Builder().handler("index.handler")
+            .interactionModelFile("LanguageModel.json")
             .create();
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "TellMeMoreIntent");
         }).utter("contact info");
     });
 
     it("Parses the Interaction Model from a locale and does a simple utterance", async () => {
-        process.chdir("test/resources");
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("index.handler")
+        const virtualAlexa = VirtualAlexa.Builder().handler("index.handler")
             .locale("de-DE")
             .create();
-        const response  = await virtualAlexa.utter("contact info") as any;
+        const response = await virtualAlexa.utter("contact info") as any;
         assert.equal(response.intent, "TellMeMoreIntent");
-        process.chdir("../..");
     });
 
     it("Parses the Interaction Model from the default locale and does a simple utterance", async () => {
-        process.chdir("test/resources");
         const virtualAlexa = VirtualAlexa.Builder()
             .handler("index.handler")
             .create();
-        const response  = await virtualAlexa.utter("contact info") as any;
+        const response = await virtualAlexa.utter("contact info") as any;
         assert.equal(response.intent, "TellMeMoreIntent");
-        process.chdir("../..");
     });
 
     it("Throws error when locale file is not present", async () => {
         try {
-            VirtualAlexa.Builder()
-                .handler("index.handler")
-                .create();
+            VirtualAlexa.Builder().handler("index.handler").create();
             assert(false, "This should not be reached");
         } catch (e) {
             assert.isDefined(e);
@@ -110,10 +79,9 @@ describe("VirtualAlexa Tests Using Files", function() {
 
     it("Has a bad filename", () => {
         try {
-            VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchemaFile("./test/resources/IntentSchema.json",
-                    "./test/resources/SampleUtterancesWrong.txt")
+            VirtualAlexa.Builder().handler("index.handler")
+                .intentSchemaFile("IntentSchema.json",
+                    "SampleUtterancesWrong.txt")
                 .create();
             assert(false, "This should not be reached");
         } catch (e) {
@@ -252,14 +220,14 @@ describe("VirtualAlexa Tests Using Unified Interaction Model", function() {
         ],
     };
 
+    const virtualAlexa = VirtualAlexa.Builder()
+        .handler("test/resources/index.handler")
+        .interactionModel(interactionModel)
+        .create();
+
     it("Parses the JSON and does a simple utterance", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
         const response = await virtualAlexa.utter("play now") as any;
-        assert.isDefined(response);
-        assert.isTrue(response.success);
+        assert.isTrue(response?.success);
     });
 
     it("Parses the file and does a simple utterance", async () => {
@@ -268,51 +236,30 @@ describe("VirtualAlexa Tests Using Unified Interaction Model", function() {
             .interactionModelFile("./test/resources/InteractionModel.json")
             .create();
         const response = await virtualAlexa.intend("AMAZON.CancelIntent") as any;
-        assert.isDefined(response);
-        assert.isTrue(response.success);
+        assert.isTrue(response?.success);
     });
 
     it("Utters builtin intent with custom phrase", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "CustomSlot");
         }).utter("custom DE");
     });
 
     it("Utters exit", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.type, "SessionEndedRequest");
         }).utter("exit");
     });
 
     it("Utters slotted phrase with empty synonym array", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "SlottedIntentEmptySynonymArray");
             assert.equal(request.request.intent.slots.SlotEmptySynonymArray.value, "value1");
         }).utter("slotEmptySynonymArray value1");
     });
 
     it("Utters slotted phrase with different synonym array", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "CustomSlot");
             assert.equal(request.request.intent.slots.customSlot.value, "UK");
             // Verify entity resolution
@@ -326,12 +273,7 @@ describe("VirtualAlexa Tests Using Unified Interaction Model", function() {
     });
 
     it("Utters slotted phrase with synonym value", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "CustomSlot");
             assert.equal(request.request.intent.slots.customSlot.value, "england");
             // Verify entity resolution
@@ -345,12 +287,7 @@ describe("VirtualAlexa Tests Using Unified Interaction Model", function() {
     });
 
     it("Utters slotted phrase with multiple synonym matches", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "CustomSlot");
             assert.equal(request.request.intent.slots.customSlot.value, "English Speakers");
             // Verify entity resolution
@@ -366,12 +303,7 @@ describe("VirtualAlexa Tests Using Unified Interaction Model", function() {
     });
 
     it("Utters slotted phrase which matches extended builtin value", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "CityIntent");
             assert.equal(request.request.intent.slots.citySlot.value, "Lima");
             // Verify entity resolution
@@ -385,12 +317,7 @@ describe("VirtualAlexa Tests Using Unified Interaction Model", function() {
     });
 
     it("Utters slotted phrase which matches builtin value", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "CityIntent");
             assert.equal(request.request.intent.slots.citySlot.value, "Chicago");
             // Verify entity resolution
@@ -402,12 +329,7 @@ describe("VirtualAlexa Tests Using Unified Interaction Model", function() {
     });
 
     it("Utters slotted phrase which matches builtin value, no extensions", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .interactionModel(interactionModel)
-            .create();
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.equal(request.request.intent.name, "StateIntent");
             assert.equal(request.request.intent.slots.stateSlot.value, "Connecticut");
             // Verify no entity resolution
@@ -455,21 +377,21 @@ describe("VirtualAlexa Tests Using JSON", function() {
         "SlottedIntent": ["slot {SlotName}"],
     };
 
+    let virtualAlexa: VirtualAlexa;
+    beforeEach(() => {
+        virtualAlexa = VirtualAlexa.Builder()
+            .handler("test/resources/index.handler")
+            .intentSchema(intentSchema, sampleUtterances)
+            .create();
+    });
+
+    afterEach(async () => {
+        await virtualAlexa.resetFilter().endSession();
+    });
+
     describe("#utter", () => {
-        let virtualAlexa: VirtualAlexa;
-        beforeEach(() => {
-            virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
-        });
-
-        afterEach(async () => {
-            await virtualAlexa.resetFilter().endSession();
-        });
-
         it("Utters simple phrase", async () => {
-            const response = await virtualAlexa.filter((request) => {
+            const response = await virtualAlexa.filter(request => {
                 assert.isUndefined(request.context.System.device.deviceId);
                 assert.isUndefined(request.context.System.apiEndpoint, "https://external.amazonalexa.com");
                 assert.isDefined(request.context.System.device.supportedInterfaces.AudioPlayer);
@@ -493,87 +415,67 @@ describe("VirtualAlexa Tests Using JSON", function() {
         });
 
         it("Utters simple phrase with different case", async () => {
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.intent.name, "Play");
             }).utter("play NOW");
         });
 
         it("Utters simple phrase with different case where sample is upper case", async () => {
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.intent.name, "Play");
             }).utter("play case");
         });
 
         it("Utters slotted phrase", async () => {
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.intent.slots.SlotName.value, "my slot");
             }).utter("Slot my slot");
         });
 
         it("Utters slotted phrase with no space", async () => {
-            let exceptionCatched = false;
             // Make sure our regular expression expects a space for between sample phrase and slot
             try {
                 await virtualAlexa.utter("Slotmy slot");
+                assert(false, "This should not be reached");
             } catch (e) {
-                exceptionCatched = true;
-                assert.equal(e.message, "Unable to match utterance: Slotmy slot to an intent. " +
+                assert.equal(e?.message, "Unable to match utterance: Slotmy slot to an intent. " +
                     "Try a different utterance, or explicitly set the intent");
-                
-            }   
-            assert.equal(exceptionCatched, true);
-        });
-
-        it("Utters slotted phrase with no space, promise catch", (done) => {
-            try {
-                virtualAlexa.utter("Slotmy slot");
-            } catch (e) {
-                assert.equal(e.message, "Unable to match utterance: Slotmy slot to an intent. " +
-                "Try a different utterance, or explicitly set the intent");
-                done();
             }
         });
 
         it("Utters builtin intent", async () => {
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.intent.name, "AMAZON.CancelIntent");
             }).utter("cancel");
         });
 
         it("Utters builtin intent with custom phrase", async () => {
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.intent.name, "AMAZON.CancelIntent");
             }).utter("cancel it now");
         });
 
         it("Utters builtin intent not in schema", async () => {
-            let exceptionCatched = false;
             try {
                 await virtualAlexa.utter("page up");
+                assert(false, "This should not be reached");
             } catch (e) {
-                exceptionCatched = true;
-                assert.equal(e.message, "Unable to match utterance: page up to an intent. " +
+                assert.equal(e?.message, "Unable to match utterance: page up to an intent. " +
                     "Try a different utterance, or explicitly set the intent");
             }
-            assert.equal(exceptionCatched, true);
         });
 
         it("Utters phrases and maintains session", async () => {
             // Calls our dummy skill twice
             // Inside the skill, it increments a counter by 1 each time
-            let response = await virtualAlexa.utter("play now") as SkillResponse;
+            let response = await virtualAlexa.utter("play now");
             assert.equal(response.sessionAttributes.counter, 0);
-            response  = await virtualAlexa.utter("play now") as SkillResponse;
+            response = await virtualAlexa.utter("play now");
             assert.equal(response.sessionAttributes.counter, 1);
         });
 
         it("Utters phrases with launch words", async () => {
-            const virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
-
-            const reply = await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.type, "IntentRequest");
                 assert.equal(request.request.intent.name, "Play");
             }).utter("tell skill to play next");
@@ -582,16 +484,12 @@ describe("VirtualAlexa Tests Using JSON", function() {
 
     describe("#utterWithDeviceInfo", () => {
         it("Utters simple phrase with device info", async () => {
-            const virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
             virtualAlexa.context.device.id = "testID";
             virtualAlexa.context.device.audioPlayerSupported(true);
             virtualAlexa.context.device.displaySupported(true);
             virtualAlexa.context.device.videoAppSupported(true);
 
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.isDefined(request.context.System.device.deviceId);
                 assert.equal(request.context.System.apiEndpoint, "https://api.amazonalexa.com");
                 assert.isDefined(request.context.System.device.supportedInterfaces.AudioPlayer);
@@ -605,29 +503,16 @@ describe("VirtualAlexa Tests Using JSON", function() {
         });
 
         it("Removes audio player capability", async () => {
-            const virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
             virtualAlexa.context.device.id = "testID";
             virtualAlexa.context.device.audioPlayerSupported(false);
 
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.isUndefined(request.context.System.device.supportedInterfaces.AudioPlayer);
             }).utter("play now");
         });
     });
 
     describe("#intend", () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .intentSchema(intentSchema, sampleUtterances)
-            .create();
-
-        afterEach(async () => {
-            await virtualAlexa.endSession();
-        });
-
         it("Intends simply", async () => {
             const response = await virtualAlexa.intend("Play") as any;
             assert.isDefined(response);
@@ -635,7 +520,7 @@ describe("VirtualAlexa Tests Using JSON", function() {
         });
 
         it("Intends with filter", async () => {
-            const reply = await virtualAlexa.filter((request) => {
+            const reply = await virtualAlexa.filter(request => {
                 request.session.sessionId = "Filtered";
             }).intend("Play") as SkillResponse;
             virtualAlexa.resetFilter();
@@ -644,8 +529,7 @@ describe("VirtualAlexa Tests Using JSON", function() {
 
         it("Intends with slot", async () => {
             const response = await virtualAlexa.intend("SlottedIntent", { SlotName: "Value" }) as any;
-            assert.isDefined(response);
-            assert.isTrue(response.success);
+            assert.isTrue(response?.success);
             assert.equal(response.slot.name, "SlotName");
             assert.equal(response.slot.value, "Value");
         });
@@ -653,66 +537,40 @@ describe("VirtualAlexa Tests Using JSON", function() {
         it("Intends with slot value but no slots on intent", async () => {
             try {
                 await virtualAlexa.intend("Play", {SlotName: "Value"});
+                assert(false, "This should not be reached");
             } catch (e) {
-                assert.equal(e.message, "Trying to add slot to intent that does not have any slots defined");
-            }
-        });
-
-        it("Intends with slot value but no slots on intent, promise catch", (done) => {
-            try {
-                virtualAlexa.intend("Play", {SlotName: "Value"});
-            } catch(e) {
-                assert.equal(e.message, "Trying to add slot to intent that does not have any slots defined");
-                done();
+                assert.equal(e?.message, "Trying to add slot to intent that does not have any slots defined");
             }
         });
 
         it("Intends with slot value but slot does not exist", async () => {
             try {
                 await virtualAlexa.intend("SlottedIntent", {SlotWrongName: "Value"});
+                assert(false, "This should not be reached");
             } catch (error) {
-                assert.equal(error.message, "Trying to add undefined slot to intent: SlotWrongName");
+                assert.equal(error?.message, "Trying to add undefined slot to intent: SlotWrongName");
             }
         });
     });
 
     describe("#endSession", () => {
-        it("Starts and Ends Session", (done) => {
-            const virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
-
+        it("Starts and Ends Session", done => {
             virtualAlexa.launch().then(() => {
                 virtualAlexa.endSession();
                 done();
             });
         });
 
-        it("Starts and Is Asked To Stop", (done) => {
-            const virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
-
-            virtualAlexa.launch().then(() => {
-                virtualAlexa.utter("stop").then(() => {
-                    assert.isUndefined(virtualAlexa.context.session);
-                    done();
-                });
-            });
+        it("Starts and Is Asked To Stop", async () => {
+            await virtualAlexa.launch();
+            await virtualAlexa.utter("stop");
+            assert.isUndefined(virtualAlexa.context.session);
         });
-
     });
 
     describe("#launch", () => {
         it("Launches with filter", async () => {
-            const virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
-
-            const reply = await virtualAlexa.filter((request) => {
+            const reply = await virtualAlexa.filter(request => {
                 request.session.sessionId = "Filtered";
             }).launch();
 
@@ -720,36 +578,28 @@ describe("VirtualAlexa Tests Using JSON", function() {
         });
 
         it("Launches with list of special utters ", async () => {
-            const virtualAlexa = VirtualAlexa.Builder()
-                .handler("test/resources/index.handler")
-                .intentSchema(intentSchema, sampleUtterances)
-                .create();
-
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.type, "LaunchRequest");
             }).utter("open skill");
 
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.type, "LaunchRequest");
             }).utter("ask skill");
 
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.type, "LaunchRequest");
             }).utter("launch skill");
 
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 assert.equal(request.request.type, "LaunchRequest");
             }).utter("talk to skill");         
         });
-
     });
 });
 
 describe("VirtualAlexa Tests Using Custom Function", function() {
     it("Calls the custom function correctly", async () => {
-        const myFunction = function(event: any, context: any) {
-            context.done(null, { custom: true });
-        };
+        const myFunction = (event: any, context: any) => context.done(null, {custom: true});
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
@@ -757,7 +607,7 @@ describe("VirtualAlexa Tests Using Custom Function", function() {
                 "./test/resources/SampleUtterances.txt")
             .create();
 
-        const reply = await virtualAlexa.filter((request) => {
+        const reply = await virtualAlexa.filter(request => {
             request.session.sessionId = "Filtered";
         }).launch() as any;
 
@@ -767,11 +617,7 @@ describe("VirtualAlexa Tests Using Custom Function", function() {
 
 describe("VirtualAlexa Tests Using Node8-style lambda", function() {
     it("Handles a promise being returned", async () => {
-        const myFunction = function(event: any, context: any) {
-            return new Promise((resolve) => {
-                resolve({ custom: true });
-            });
-        };
+        const myFunction = (_: any, __: any) => Promise.resolve({custom: true});
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
@@ -779,7 +625,7 @@ describe("VirtualAlexa Tests Using Node8-style lambda", function() {
                 "./test/resources/SampleUtterances.txt")
             .create();
 
-        const reply = await virtualAlexa.filter((request) => {
+        const reply = await virtualAlexa.filter(request => {
             request.session.sessionId = "Filtered";
         }).launch() as any;
 
@@ -787,11 +633,7 @@ describe("VirtualAlexa Tests Using Node8-style lambda", function() {
     });
 
     it("Handles a promise being returned with error", async () => {
-        const myFunction = function(event: any, context: any) {
-            return new Promise((resolve, reject) => {
-                reject("Error");
-            });
-        };
+        const myFunction = (_: any, __: any) => Promise.reject("Error");
 
         const virtualAlexa = VirtualAlexa.Builder()
             .handler(myFunction)
@@ -800,7 +642,7 @@ describe("VirtualAlexa Tests Using Node8-style lambda", function() {
             .create();
 
         try {
-            await virtualAlexa.filter((request) => {
+            await virtualAlexa.filter(request => {
                 request.session.sessionId = "Filtered";
             }).launch();
             assert.fail("This should not be reached");
@@ -811,17 +653,17 @@ describe("VirtualAlexa Tests Using Node8-style lambda", function() {
 });
 
 describe("Echo Show Tests", () => {
-    it("Gets echo display stuff from response", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .intentSchemaFile("./test/resources/IntentSchema.json",
-                "./test/resources/SampleUtterances.txt")
-            .create();
-        virtualAlexa.context.device.id = "testID";
-        virtualAlexa.context.device.audioPlayerSupported(false);
-        virtualAlexa.context.device.displaySupported(true);
+    const virtualAlexa = VirtualAlexa.Builder()
+        .handler("test/resources/index.handler")
+        .intentSchemaFile("./test/resources/IntentSchema.json",
+            "./test/resources/SampleUtterances.txt")
+        .create();
+    virtualAlexa.context.device.id = "testID";
+    virtualAlexa.context.device.audioPlayerSupported(false);
+    virtualAlexa.context.device.displaySupported(true);
 
-        const response = await virtualAlexa.utter("play now") as SkillResponse;
+    it("Gets echo display stuff from response", async () => {
+        const response = await virtualAlexa.utter("play now");
         assert.isDefined(response.display());
         assert.equal(response.primaryText(), "PrimaryText");
         assert.equal(response.primaryText("ListToken1"), "ListItem1PrimaryText");
@@ -831,16 +673,7 @@ describe("Echo Show Tests", () => {
     });
 
     it("Selects an element", async () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .intentSchemaFile("./test/resources/IntentSchema.json",
-                "./test/resources/SampleUtterances.txt")
-            .create();
-        virtualAlexa.context.device.id = "testID";
-        virtualAlexa.context.device.audioPlayerSupported(false);
-        virtualAlexa.context.device.displaySupported(true);
-
-        await virtualAlexa.filter((request) => {
+        await virtualAlexa.filter(request => {
             assert.isDefined(request.context.Display);
             assert.equal(request.request.type, "Display.ElementSelected");
             assert.equal(request.request.token, "ListToken1");
@@ -858,9 +691,9 @@ describe("Request Builder tests", () => {
 
         const request = virtualAlexa.request().intent("Play")
             .set("request.path1", "value")
-            .set("request.array[0].prop", "value");
+            .set("request.array[0].prop", "value2");
         assert.equal(request.json.request.path1, "value");
-        assert.equal(request.json.request.array[0].prop, "value");
+        assert.equal(request.json.request.array[0].prop, "value2");
     });
 });
 
@@ -872,8 +705,7 @@ describe("Catalog tests", () => {
             .create();
 
         const response = await virtualAlexa.intend("IngredientIntent", { Ingredient: "cucumber"}) as any;
-        assert.isDefined(response);
-        assert.isTrue(response.success);
+        assert.isTrue(response?.success);
         assert.equal(response.slot.name, "Ingredient");
         assert.equal(response.slot.value, "cucumber");
     });
