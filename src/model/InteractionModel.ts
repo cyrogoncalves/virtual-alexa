@@ -184,7 +184,7 @@ export interface SlotType {
     regex?: string
 }
 
-interface ISlotValue {
+export interface ISlotValue {
     id?: string;
     builtin?: boolean;
     name: {

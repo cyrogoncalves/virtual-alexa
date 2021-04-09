@@ -3,8 +3,8 @@ import { AddressAPI } from "../external/AddressAPI";
 import { DynamoDB } from "../external/DynamoDB";
 import { SkillInteractor } from "../interactor";
 import { InteractionModel } from "../model/InteractionModel";
-import { Device, DialogManager, SkillSession } from "./SkillContext";
-import { SessionEndedReason, SkillRequest } from "./SkillRequest";
+import { ConfirmationStatus, Device, DialogManager, SkillSession } from "./SkillContext";
+import { RequestType, SessionEndedReason, SkillRequest } from "./SkillRequest";
 import { SkillResponse } from "./SkillResponse";
 import { UserAPI } from "../external/UserAPI";
 import { VirtualAlexaBuilder } from '../builder';
@@ -91,19 +91,49 @@ export class VirtualAlexa {
      * Useful for highly customized JSON requests
      */
     public request(): SkillRequest {
-        return new SkillRequest(this.model, this._interactor, this.requestFilter,
-            this.locale, this.applicationID, this.audioPlayer, this.device, this.userId, this.accessToken,
-            this.apiAccessToken, this.apiEndpoint, this.dialogManager,
+        const json = this.createRequestJson();
+        return new SkillRequest(json, this.model, this._interactor, this.requestFilter,
+            this.applicationID, this.audioPlayer, this.device, this.userId, this.accessToken,
+            this.dialogManager,
             this);
     }
     
     /**
      * Sends a Display.ElementSelected request with the specified token
-     * @param {string} token
+     * @param {string} token The token for the selected element
      * @returns {Promise<SkillResponse>}
      */
     public selectElement(token: any): Promise<SkillResponse> {
-        return this.request().elementSelected(token).send();
+        const json = this.createRequestJson();
+        const request = new SkillRequest(json, this.model, this._interactor, this.requestFilter,
+            this.applicationID, this.audioPlayer, this.device, this.userId, this.accessToken,
+            this.dialogManager, this);
+        json.request.type = RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST;
+        json.request.token = token;
+        return request.send();
+    }
+
+    /**
+     * Creates a connection response object - used by Alexa Connections such as In-Skill Purchases
+     * @param requestName
+     * @param purchaseResult for the payload object
+     * @param productId for the payload object
+     * @param token The correlating token
+     * @param statusCode The status code
+     * @param statusMessage The status message
+     */
+    public inSkillPurchaseResponse(requestName: string, purchaseResult: string, productId: string,
+                                   token: string, statusCode = 200, statusMessage = "OK"): SkillRequest {
+        const json = this.createRequestJson();
+        const request = new SkillRequest(json, this.model, this._interactor, this.requestFilter,
+            this.applicationID, this.audioPlayer, this.device, this.userId, this.accessToken,
+            this.dialogManager, this);
+        json.request.type = RequestType.CONNECTIONS_RESPONSE;
+        json.request.name = requestName;
+        json.request.payload = {productId, purchaseResult};
+        json.request.token = token;
+        json.request.status = {code: statusCode, message: statusMessage};
+        return request;
     }
 
     /**
@@ -142,5 +172,46 @@ export class VirtualAlexa {
             .intent(intent)
             .slots(json)
             .send();
+    }
+
+    private createRequestJson() {
+        // First create the header part of the request
+        const json: any =  {
+            context: {
+                System: {
+                    application: {
+                        applicationId: this.applicationID,
+                    },
+                    device: {
+                        supportedInterfaces: this.device.supportedInterfaces,
+                    },
+                    user: {
+                        userId: this.userId,
+                        ...(this.device.id && { permissions: { consentToken: uuid.v4() } }),
+                        ...(this.accessToken && { accessToken: this.accessToken })
+                    },
+                },
+            },
+            request: {
+                locale: this.locale || "en-US",
+                requestId: "amzn1.echo-external.request." + uuid.v4(),
+                timestamp: new Date().toISOString().substring(0, 19) + "Z",
+            },
+            version: "1.0",
+        };
+
+        // If the device ID is set, we set the API endpoint and deviceId properties
+        if (this.device.id) {
+            json.context.System.apiAccessToken = this.apiAccessToken;
+            json.context.System.apiEndpoint = this.apiEndpoint;
+            json.context.System.device.deviceId = this.device.id;
+        }
+
+        // If display enabled, we add a display object to context
+        if (this.device.displaySupported()) {
+            json.context.Display = {};
+        }
+
+        return json;
     }
 }

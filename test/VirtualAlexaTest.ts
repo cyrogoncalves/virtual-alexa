@@ -716,7 +716,7 @@ describe("Connection Response tests", () => {
             .interactionModelFile("test/resources/catalogModel/models/en-US.json")
             .create();
 
-        const request = virtualAlexa.request().inSkillPurchaseResponse("Buy",
+        const request = virtualAlexa.inSkillPurchaseResponse("Buy",
             "DECLINED",
             "ProductId",
             "MyToken")
