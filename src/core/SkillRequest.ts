@@ -152,58 +152,44 @@ export class SkillRequest {
      * @param confirmationStatus
      */
     public slot(slotName: string, slotValue: string, confirmationStatus = ConfirmationStatus.NONE): SkillRequest {
-        const slots: any[] = this.interactionModel.intents
-            .find(o => o.intent === this.json.request.intent.name)?.slots;
-        if (!slots) throw new Error("Trying to add slot to intent that does not have any slots defined");
         const comp = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+        const slots: any[] = this.interactionModel.intents.find(o => o.intent === this.json.request.intent.name)?.slots;
+        if (!slots) throw new Error("Trying to add slot to intent that does not have any slots defined");
         const slot = slots?.find(s => comp(slotName, s.name));
         if (!slot) throw new Error("Trying to add undefined slot to intent: " + slotName);
 
         const resolutionsPerAuthority: {
             values: EntityResolutionValue[];
             status: {
-                code: EntityResolutionStatus
+                code: "ER_SUCCESS_MATCH" | "ER_SUCCESS_NO_MATCH"
             };
             authority: string;
         }[] = [];
-        const slotType = this.interactionModel.slotTypes.find(o => comp(o.name, slot.type));
-        // We only include the entity resolution for builtin types if they have been extended
-        //  and for all custom slot types.
-        // If this is not a builtin value, we add the entity resolution.
-        if (slotType && (!slotType.name.startsWith("AMAZON") || slotType.values.some(value => !value.builtin))) {
+        const slotType = this.interactionModel.slotTypes.find(o => comp(o.name, slot.type))
+        const enumeratedValues = slotType?.values?.filter(sv => !sv.builtin);
+        // Only includes the entity resolution for builtin types if they have been extended.
+        if (enumeratedValues?.length) {
             const authority = `amzn1.er-authority.echo-sdk.${this.applicationId}.${slotType.name}`;
 
-            slotType.values?.filter(sv => !sv.builtin).forEach(enumeratedValue => {
-                // First check the name value - the value and the synonyms are both valid matches
-                // Refer here for definitive rules:
-                //  https://developer.amazon.com/docs/custom-skills/
-                //      define-synonyms-and-ids-for-slot-type-values-entity-resolution.html
+            enumeratedValues.forEach(enumeratedValue => {
+                // First check the name value. It's possible to have multiple matches, where we have overlapping synonyms.
+                // Refer here for definitive rules: https://developer.amazon.com/docs/custom-skills/define-synonyms-and-ids-for-slot-type-values-entity-resolution.html
                 const count = comp(enumeratedValue.name.value, slotValue) ? 1
-                    // Possible to have multiple matches, where we have overlapping synonyms
                     : (enumeratedValue.name.synonyms?.filter(synonym => comp(synonym, slotValue)).length ?? 0);
-                const values = new Array(count).fill({value: {
-                    id: enumeratedValue.id, name: enumeratedValue.name.value}
-                });
                 if (count) {
+                    const values = new Array(count).fill({value: {id: enumeratedValue.id, name: enumeratedValue.name.value}});
                     const existingResolution = resolutionsPerAuthority.find(resolution => resolution.authority === authority);
                     if (existingResolution) {
                         existingResolution.values.push(...values);
                     } else {
-                        resolutionsPerAuthority.push({
-                            authority,
-                            values: values,
-                            status: {code: EntityResolutionStatus.ER_SUCCESS_MATCH}
-                        });
+                        resolutionsPerAuthority.push({authority, values: values, status: {code: "ER_SUCCESS_MATCH"}});
                     }
                 }
             });
 
             if (!resolutionsPerAuthority.length) {
-                resolutionsPerAuthority.push({
-                    authority,
-                    values: [],
-                    status: {code: EntityResolutionStatus.ER_SUCCESS_NO_MATCH}
-                });
+                resolutionsPerAuthority.push({authority, values: [], status: {code: "ER_SUCCESS_NO_MATCH"}});
             }
         }
 
@@ -215,10 +201,8 @@ export class SkillRequest {
         };
         this.json.request.intent.slots[slotName] = slotValueObject;
 
-        if (this.interactionModel.dialogIntent(this.json.request.intent.name)) {
-            // Update the internal state of the dialog manager based on this request
-            this.dialogManager.updateSlot(slotName, slotValueObject);
-        }
+        // Update the internal state of the dialog manager based on this request
+        this.dialogManager.updateSlot(slotName, slotValueObject);
 
         return this;
     }

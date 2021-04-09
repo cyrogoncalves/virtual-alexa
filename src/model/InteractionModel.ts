@@ -170,7 +170,7 @@ interface DialogIntent {
     }[];
 }
 
-export class SlotMatch {
+class SlotMatch {
     public untyped: boolean;
     public constructor(public value?: string,
                        public enumeratedValue?: ISlotValue) {
@@ -184,7 +184,7 @@ export interface SlotType {
     regex?: string
 }
 
-export interface ISlotValue {
+interface ISlotValue {
     id?: string;
     builtin?: boolean;
     name: {

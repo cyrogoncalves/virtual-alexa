@@ -40,7 +40,7 @@ describe("DialogManager tests", function() {
             assert.equal(response.directive("Dialog.Delegate").type, "Dialog.Delegate");
             return virtualAlexa.intend("PetMatchIntent", { temperament: "watch"});
         }).then((response: SkillResponse) => {
-            console.log("Response: " + JSON.stringify(response, null, 2));
+            // console.log("Response: " + JSON.stringify(response, null, 2));
             assert.equal(response.directive("Dialog.Delegate").type, "Dialog.Delegate");
             return virtualAlexa.intend("PetMatchIntent", { energy: "high"});
         }).then((response: SkillResponse) => {
