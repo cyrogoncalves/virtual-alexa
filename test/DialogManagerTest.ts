@@ -1,7 +1,5 @@
 import {assert} from "chai";
-import {SkillResponse} from "../src/core/SkillResponse";
-import {VirtualAlexa} from "../src/core/VirtualAlexa";
-import { ConfirmationStatus } from '../src/core/SkillContext';
+import {VirtualAlexa} from "../src";
 
 process.on("unhandledRejection", (e: any) => console.error(e));
 
@@ -12,17 +10,17 @@ describe("DialogManager tests", () => {
             .interactionModelFile("test/resources/dialogModel/dialog-model.json")
             .create();
 
-        let request = virtualAlexa.request().intent("PetMatchIntent").slot("size", "big");
-        assert.equal(request.json.request.dialogState, "STARTED");
-        assert.equal(request.json.request.intent.slots.size.value, "big");
-        assert.equal(request.json.request.intent.slots.size.resolutionsPerAuthority.length, 1);
-        await request.send();
+        await virtualAlexa.filter(request => {
+            assert.equal(request.request.dialogState, "STARTED");
+            assert.equal(request.request.intent.slots.size.value, "big");
+            assert.equal(request.request.intent.slots.size.resolutionsPerAuthority.length, 1);
+        }).intend("PetMatchIntent", {"size": "big"});
 
-        let request2 = virtualAlexa.request().intent("PetMatchIntent").slot("temperament", "watch");
-        assert.equal(request2.json.request.intent.slots.size.value, "big");
-        assert.equal(request2.json.request.intent.slots.temperament.value, "watch");
-        assert.equal(request2.json.request.intent.slots.temperament.resolutionsPerAuthority.length, 1);
-        await request2.send();
+        await virtualAlexa.filter(request => {
+            assert.equal(request.request.intent.slots.size.value, "big");
+            assert.equal(request.request.intent.slots.temperament.value, "watch");
+            assert.equal(request.request.intent.slots.temperament.resolutionsPerAuthority.length, 1);
+        }).intend("PetMatchIntent", {"temperament": "watch"});
     });
 
     it("Interacts with delegated dialog, version 2", async () => {
@@ -67,14 +65,13 @@ describe("DialogManager tests", () => {
         let skillResponse = await virtualAlexa.intend("PetMatchIntent", { size: "small"});
         assert.equal(skillResponse.directive("Dialog.ConfirmSlot").type, "Dialog.ConfirmSlot");
         assert.include(skillResponse.prompt(), "small?");
-        virtualAlexa.filter((request) => {
+        virtualAlexa.filter(request => {
+            request.request.intent.slots.size.confirmationStatus = "CONFIRMED";
             assert.equal(request.request.intent.slots.size.confirmationStatus, "CONFIRMED");
             assert.equal(request.request.intent.slots.size.value, "small");
         });
 
-        skillResponse = await virtualAlexa.request().intent("PetMatchIntent")
-            .slot("size", "small", ConfirmationStatus.CONFIRMED).send();
-        virtualAlexa.resetFilter();
+        skillResponse = await virtualAlexa.intend("PetMatchIntent", {"size": "small"});
         assert.equal(skillResponse.directive("Dialog.ElicitSlot").type, "Dialog.ElicitSlot");
         assert.equal(skillResponse.prompt(), "Are you looking for a family dog?");
 

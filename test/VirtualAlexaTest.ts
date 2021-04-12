@@ -679,22 +679,6 @@ describe("Echo Show Tests", () => {
     });
 });
 
-describe("Request Builder tests", () => {
-    it("Sets JSON values", () => {
-        const virtualAlexa = VirtualAlexa.Builder()
-            .handler("test/resources/index.handler")
-            .intentSchemaFile("./test/resources/IntentSchema.json",
-                "./test/resources/SampleUtterances.txt")
-            .create();
-
-        const request = virtualAlexa.request().intent("Play")
-            .set("request.path1", "value")
-            .set("request.array[0].prop", "value2");
-        assert.equal(request.json.request.path1, "value");
-        assert.equal(request.json.request.array[0].prop, "value2");
-    });
-});
-
 describe("Catalog tests", () => {
     it("Sets JSON values", async () => {
         const virtualAlexa = VirtualAlexa.Builder()
@@ -716,15 +700,12 @@ describe("Connection Response tests", () => {
             .interactionModelFile("test/resources/catalogModel/models/en-US.json")
             .create();
 
-        const request = virtualAlexa.inSkillPurchaseResponse("Buy",
-            "DECLINED",
-            "ProductId",
-            "MyToken")
-        
-        assert.equal(request.json.request.type, "Connections.Response");
-        assert.equal(request.json.request.payload.productId, "ProductId");
-        assert.equal(request.json.request.payload.purchaseResult, "DECLINED");
-        assert.equal(request.json.request.status.code, 200);
-        assert.equal(request.json.request.status.message, "OK");
+        await virtualAlexa.filter(request => {
+            assert.equal(request.request.type, "Connections.Response");
+            assert.equal(request.request.payload.productId, "ProductId");
+            assert.equal(request.request.payload.purchaseResult, "DECLINED");
+            assert.equal(request.request.status.code, 200);
+            assert.equal(request.request.status.message, "OK");
+        }).inSkillPurchaseResponse("Buy", "DECLINED", "ProductId", "MyToken");
     });
 });

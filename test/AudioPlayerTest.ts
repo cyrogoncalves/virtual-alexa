@@ -40,18 +40,10 @@ describe("AudioPlayer launches and plays a track", function() {
             .create();
 
         try {
-            // We capture the requests being sent to virtual alexa
-            // Because the AudioPlayer does some stuff internally automatically, want to ensure it is working properly
-            const requests: any[] = [];
-            virtualAlexa.filter((json) => {
-                requests.push(json.request);
-            });
-
-            const skillRequest = virtualAlexa.request();
-            await skillRequest.launch().send();
+            await virtualAlexa.launch();
             const reply = await virtualAlexa.utter("play") as SkillResponse;
             assert.include(reply.response.directives[0].audioItem.stream.url, "episode-013");
-            assert.isTrue(skillRequest.audioPlayer0.isPlaying());
+            assert.isTrue(virtualAlexa.audioPlayer.isPlaying());
         } catch (e) {
             console.log(e);
         }

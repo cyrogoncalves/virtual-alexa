@@ -1,5 +1,4 @@
-import { RequestType, SessionEndedReason } from "../core/SkillRequest";
-import { VirtualAlexa } from "../core/VirtualAlexa";
+import { VirtualAlexa, RequestType, SessionEndedReason } from "../core/VirtualAlexa";
 
 export enum AudioPlayerActivity {
     BUFFER_UNDERRUN,
@@ -155,10 +154,7 @@ export class AudioPlayer {
     }
 
     private async audioPlayerRequest(requestType: string): Promise<any> {
-        const nowPlaying = this.playing();
-        return this._alexa.request()
-            .audioPlayer(requestType, nowPlaying.stream.token, nowPlaying.stream.offsetInMilliseconds)
-            .send();
+        return this._alexa.audioPlayerRequest(requestType);
     }
 
     private async enqueue(audioItem: AudioItem, playBehavior: string): Promise<void> {
