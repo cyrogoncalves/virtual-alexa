@@ -1,4 +1,4 @@
-import { AudioBuiltinIntents } from "../audioPlayer/AudioPlayer";
+import { AudioBuiltinIntents } from '../core/VirtualAlexa';
 
 const LONG_FORM_VALUES: {[id: string]: string []} = {
     1: ["one"],

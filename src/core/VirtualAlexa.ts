@@ -1,4 +1,3 @@
-import { AudioPlayer, AudioPlayerActivity } from "../audioPlayer/AudioPlayer";
 import { AddressAPI } from "../external/AddressAPI";
 import { DynamoDB } from "../external/DynamoDB";
 import { SkillInteractor } from "../interactor";
@@ -43,7 +42,7 @@ export class VirtualAlexa {
         private readonly locale: string,
         private readonly applicationID: string = "amzn1.echo-sdk-ams.app." + uuid.v4()
     ) {
-        this.audioPlayer = new AudioPlayer(this);
+        this.audioPlayer = new AudioPlayer();
         this.addressAPI = new AddressAPI(this.apiEndpoint, this.device);
         this.userAPI = new UserAPI(this.apiEndpoint);
         this.dynamoDB = new DynamoDB();
@@ -69,7 +68,7 @@ export class VirtualAlexa {
      * Does not wait for a reply, as there should be none
      * @returns {Promise<SkillResponse>}
      */
-    public endSession(sessionEndedReason: SessionEndedReason = SessionEndedReason.USER_INITIATED,
+    public endSession(sessionEndedReason = SessionEndedReason.USER_INITIATED,
             errorData?: any): Promise<SkillResponse> {
         const json = this.createRequestJson();
         json.request.type = RequestType.SESSION_ENDED_REQUEST;
@@ -91,12 +90,9 @@ export class VirtualAlexa {
                   confirmationStatus = ConfirmationStatus.NONE): Promise<SkillResponse> {
         const json = this.createRequestJson();
 
-        // skillRequest.intent(intentName);
         json.request.type = RequestType.INTENT_REQUEST;
-        if (!intentName.startsWith("AMAZON")) { // no built-in
-            if (!this.model.intents.some(o => o.intent === intentName)) {
-                throw new Error("Interaction model has no intentName named: " + intentName);
-            }
+        if (!intentName.startsWith("AMAZON") && !this.model.intents.some(o => o.intent === intentName)) {
+            throw new Error("Interaction model has no intentName named: " + intentName);
         }
 
         json.request.intent = {
@@ -124,32 +120,11 @@ export class VirtualAlexa {
             json.request.intent.slots = this.dialogManager.slots();
         }
 
-        this.slots(slots, json);
+        slots && Object.entries(slots).forEach(([name, value]) => this.slot(json, name, value));
+
         return this.send(json);
     }
 
-    public audioPlayerRequest(requestType: string) {
-        const json = this.createRequestJson();
-        const nowPlaying = this.audioPlayer.playing();
-        json.request.type = requestType;
-        json.request.token = nowPlaying.stream.token;
-        json.request.offsetInMilliseconds = nowPlaying.stream.offsetInMilliseconds;
-        return this.send(json);
-    }
-
-    // /**
-    //  * Get skill request instance to build a request from scratch.
-    //  *
-    //  * Useful for highly customized JSON requests
-    //  */
-    // public request(): SkillRequest {
-    //     const json = this.createRequestJson();
-    //     return new SkillRequest(json, this.model, this._interactor, this.requestFilter,
-    //         this.applicationID, this.audioPlayer, this.device, this.userId, this.accessToken,
-    //         this.dialogManager,
-    //         this);
-    // }
-    
     /**
      * Sends a Display.ElementSelected request with the specified token
      * @param {string} token The token for the selected element
@@ -286,29 +261,30 @@ export class VirtualAlexa {
                 },
                 ...(json.request.type !== RequestType.LAUNCH_REQUEST && { attributes: this.session.attributes })
             };
+        }
 
-            // For intent, launch and session ended requests, send the audio player state if there is one
-            if (this.device.audioPlayerSupported()) {
-                const activity = AudioPlayerActivity[this.audioPlayer.playerActivity()];
-                json.context.AudioPlayer = {
-                    playerActivity: activity,
-                };
+        // For intent, launch and session ended requests, send the audio player state if there is one
+        if (this.device.audioPlayerSupported()) {
+            json.context.AudioPlayer = {
+                playerActivity: AudioPlayerActivity[this.audioPlayer._activity],
+            };
 
-                // Anything other than IDLE, we send token and offset
-                if (this.audioPlayer.playerActivity() !== AudioPlayerActivity.IDLE) {
-                    const playing = this.audioPlayer.playing();
-                    json.context.AudioPlayer.token = playing.stream.token;
-                    json.context.AudioPlayer.offsetInMilliseconds = playing.stream.offsetInMilliseconds;
-                }
+            // Anything other than IDLE, we send token and offset
+            if (this.audioPlayer._activity !== AudioPlayerActivity.IDLE) {
+                const playing = this.audioPlayer.playingItem();
+                json.context.AudioPlayer.token = playing.token;
+                json.context.AudioPlayer.offsetInMilliseconds = playing.offsetInMilliseconds;
             }
         }
 
         // When the user utters an intent, we suspend for it
         // We do this first to make sure everything is in the right state for what comes next
-        if (json.request.intent
-            && this.device.audioPlayerSupported()
-            && this.audioPlayer.isPlaying()) {
-            await this.audioPlayer.suspend();
+        if (json.request.intent && this.device.audioPlayerSupported()) {
+            if (this.audioPlayer._activity === AudioPlayerActivity.PLAYING) {
+                this.audioPlayer._suspended = true;
+                this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
+                await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
+            }
         }
 
         this.requestFilter?.(json);
@@ -329,7 +305,9 @@ export class VirtualAlexa {
         }
 
         if (result.response?.directives) {
-            await this.audioPlayer.directivesReceived(result.response.directives);
+            for (const directive of result.response.directives) {
+                await this.handleAudioDirective(directive);
+            }
             // Update the dialog manager based on the results
             // Look for a dialog directive - trigger dialog mode if so
             for (const directive of result.response.directives) {
@@ -343,14 +321,27 @@ export class VirtualAlexa {
         }
 
         // Resume the audio player, if suspended
-        if (json.request.intent
-            && this.device.audioPlayerSupported()
-            && this.audioPlayer.suspended()) {
-            await this.audioPlayer.resume();
+        if (json.request.intent && this.device.audioPlayerSupported()) {
+            if (this.audioPlayer._suspended) {
+                this.audioPlayer._suspended = false;
+                if (this.audioPlayer._activity !== AudioPlayerActivity.PLAYING) {
+                    this.audioPlayer._activity = AudioPlayerActivity.PLAYING;
+                    await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED);
+                }
+            }
         }
 
         return new SkillResponse(result);
     }
+
+    private audioPlayerRequest(requestType: string) {
+        const json = this.createRequestJson();
+        json.request.type = requestType;
+        json.request.token = this.audioPlayer.playingItem().token;
+        json.request.offsetInMilliseconds = this.audioPlayer.playingItem().offsetInMilliseconds;
+        return this.send(json);
+    }
+
 
     /**
      * Sets a slot value on the request
@@ -415,12 +406,44 @@ export class VirtualAlexa {
         return this;
     }
 
-    /**
-     * Sets slot values as a dictionary of strings on the request
-     */
-    private slots(slots: {[id: string]: string}, json: any): VirtualAlexa {
-        slots && Object.entries(slots).forEach(([name, value]) => this.slot(json, name, value));
-        return this;
+    private async handleAudioDirective(directive: any): Promise<any> {
+        if (directive.type === "AudioPlayer.Play") {
+            if (directive.playBehavior === "ENQUEUE") {
+                this.audioPlayer._queue.push(directive.audioItem.stream);
+            } else if (directive.playBehavior === "REPLACE_ALL") {
+                if (this.audioPlayer._activity === AudioPlayerActivity.PLAYING) {
+                    this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
+                    await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
+                }
+                this.audioPlayer._queue = [directive.audioItem.stream];
+            } else if (directive.playBehavior === "REPLACE_ENQUEUED") {
+                this.audioPlayer._queue = [directive.audioItem.stream];
+            }
+
+            if (this.audioPlayer._activity !== AudioPlayerActivity.PLAYING && this.audioPlayer._queue.length !== 0) {
+                // dequeue
+                if (!this.audioPlayer._queue[0].url) {
+                    return this.endSession(SessionEndedReason.ERROR, {
+                        message: "The URL specified in the Play directive must be defined and a valid HTTPS url",
+                        type: "INVALID_RESPONSE",
+                    });
+                } else if (this.audioPlayer._queue[0].url.startsWith("http:")) {
+                    return this.endSession(SessionEndedReason.ERROR, {
+                        message: "The URL specified in the Play directive must be HTTPS",
+                        type: "INVALID_RESPONSE",
+                    });
+                }
+                this.audioPlayer._activity = AudioPlayerActivity.PLAYING;
+                return this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED);
+            }
+        } else if (directive.type === "AudioPlayer.Stop") {
+            if (this.audioPlayer._suspended) {
+                this.audioPlayer._suspended = false;
+            } else if (this.audioPlayer.playingItem()) {
+                this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
+                await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
+            }
+        }
     }
 }
 
@@ -437,8 +460,6 @@ export enum RequestType {
     INTENT_REQUEST = "IntentRequest",
     LAUNCH_REQUEST = "LaunchRequest",
     SESSION_ENDED_REQUEST = "SessionEndedRequest",
-    AUDIO_PLAYER_PLAYBACK_FINISHED = "AudioPlayer.PlaybackFinished",
-    AUDIO_PLAYER_PLAYBACK_NEARLY_FINISHED = "AudioPlayer.PlaybackNearlyFinished",
     AUDIO_PLAYER_PLAYBACK_STARTED = "AudioPlayer.PlaybackStarted",
     AUDIO_PLAYER_PLAYBACK_STOPPED = "AudioPlayer.PlaybackStopped",
 }
@@ -449,3 +470,65 @@ export enum SessionEndedReason {
     USER_INITIATED,
 }
 
+export enum AudioPlayerActivity {
+    // BUFFER_UNDERRUN,
+    // FINISHED,
+    IDLE,
+    PLAYING,
+    // PAUSED,
+    STOPPED,
+}
+
+export const AudioBuiltinIntents = {
+    "AMAZON.CancelIntent": ["cancel", "never mind"],
+    "AMAZON.HelpIntent": ["help", "help me"],
+    "AMAZON.LoopOffIntent": ["loop off"],
+    "AMAZON.LoopOnIntent": ["loop", "loop on", "keep repeating this song"],
+    "AMAZON.MoreIntent": ["more"],
+    "AMAZON.NavigateHomeIntent": ["home", "go home"],
+    "AMAZON.NavigateSettingsIntent": ["settings"],
+    "AMAZON.NextIntent": ["next", "skip", "skip forward"],
+    "AMAZON.NoIntent": ["no", "no thanks"],
+    "AMAZON.PageDownIntent": ["page down"],
+    "AMAZON.PageUpIntent": ["page up"],
+    "AMAZON.PauseIntent": ["pause", "pause that"],
+    "AMAZON.PreviousIntent": ["go back", "previous", "skip back", "back up"],
+    "AMAZON.RepeatIntent": ["repeat", "say that again", "repeat that"],
+    "AMAZON.ResumeIntent": ["resume", "continue", "keep going"],
+    "AMAZON.ScrollDownIntent": ["scroll down"],
+    "AMAZON.ScrollLeftIntent": ["scroll left"],
+    "AMAZON.ScrollRightIntent": ["scroll right"],
+    "AMAZON.ScrollUpIntent": ["scroll up"],
+    "AMAZON.ShuffleOffIntent": ["shuffle off", "stop shuffling", "turn off shuffle"],
+    "AMAZON.ShuffleOnIntent": ["shuffle", "shuffle on", "shuffle the music", "shuffle mode"],
+    "AMAZON.StartOverIntent": ["start over", "restart", "start again"],
+    "AMAZON.StopIntent": ["stop", "off", "shut up"],
+    "AMAZON.YesIntent": ["yes", "yes please", "sure"],
+};
+
+/**
+ * Emulates the behavior of the audio player
+ */
+export class AudioPlayer {
+    /** @internal */
+    public _queue: AudioItem[] = [];
+    /** @internal */
+    public _activity: AudioPlayerActivity = AudioPlayerActivity.IDLE;
+    /** @internal */
+    public _suspended: boolean = false;
+
+    /**
+     * The currently playing track
+     * @returns {AudioItem}
+     */
+    public playingItem(): AudioItem {
+        return this._queue[0];
+    }
+}
+
+export interface AudioItem {
+    readonly url: string;
+    readonly token: string;
+    readonly expectedPreviousToken: string;
+    readonly offsetInMilliseconds: number;
+}
