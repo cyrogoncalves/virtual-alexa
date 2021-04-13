@@ -1,5 +1,5 @@
 import * as nock from "nock";
-import { Device } from "../core/SkillContext";
+import { Device } from "../core/VirtualAlexa";
 
 export class AddressAPI {
     /** @internal */

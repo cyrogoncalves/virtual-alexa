@@ -2,7 +2,7 @@ import { AddressAPI } from "../external/AddressAPI";
 import { DynamoDB } from "../external/DynamoDB";
 import { SkillInteractor } from "../interactor";
 import { InteractionModel } from "../model/InteractionModel";
-import { ConfirmationStatus, Device, DialogManager, SkillSession } from "./SkillContext";
+import { ConfirmationStatus, DialogManager } from "./SkillContext";
 import { SkillResponse } from "./SkillResponse";
 import { UserAPI } from "../external/UserAPI";
 import { VirtualAlexaBuilder } from '../builder';
@@ -26,9 +26,6 @@ export class VirtualAlexa {
     public readonly userId = "amzn1.ask.account." + uuid.v4();
 
     session: SkillSession;
-    public newSession(): void {
-        this.session = new SkillSession();
-    }
     public endSession2(): void {
         this.dialogManager.reset();
         this.session = undefined;
@@ -88,19 +85,17 @@ export class VirtualAlexa {
      */
     public intend(intentName: string, slots?: {[id: string]: string},
                   confirmationStatus = ConfirmationStatus.NONE): Promise<SkillResponse> {
-        const json = this.createRequestJson();
-
-        json.request.type = RequestType.INTENT_REQUEST;
         if (!intentName.startsWith("AMAZON") && !this.model.intents.some(o => o.intent === intentName)) {
             throw new Error("Interaction model has no intentName named: " + intentName);
         }
 
+        const json = this.createRequestJson();
+        json.request.type = RequestType.INTENT_REQUEST;
         json.request.intent = {
             confirmationStatus: confirmationStatus,
             name: intentName,
             slots: {},
         };
-
         // Set default slot values - all slots must have a value for an intent
         this.model.intents.find(o => o.intent === intentName)?.slots?.forEach((intentSlot: any) =>
             json.request.intent.slots[intentSlot.name] = {
@@ -194,9 +189,9 @@ export class VirtualAlexa {
         return this.intend(intent, json);
     }
 
-    private createRequestJson() {
+    private createRequestJson(): any {
         // First create the header part of the request
-        const json: any =  {
+        return {
             context: {
                 System: {
                     application: {
@@ -204,13 +199,16 @@ export class VirtualAlexa {
                     },
                     device: {
                         supportedInterfaces: this.device.supportedInterfaces,
+                        ...(this.device.id && { deviceId: this.device.id }),
                     },
                     user: {
                         userId: this.userId,
                         ...(this.device.id && { permissions: { consentToken: uuid.v4() } }),
                         ...(this.accessToken && { accessToken: this.accessToken })
                     },
+                    ...(this.device.id && { apiAccessToken: this.apiAccessToken, apiEndpoint: this.apiEndpoint }),
                 },
+                ...(this.device.displaySupported() && {Display: {}})
             },
             request: {
                 locale: this.locale || "en-US",
@@ -219,22 +217,7 @@ export class VirtualAlexa {
             },
             version: "1.0",
         };
-
-        // If the device ID is set, we set the API endpoint and deviceId properties
-        if (this.device.id) {
-            json.context.System.apiAccessToken = this.apiAccessToken;
-            json.context.System.apiEndpoint = this.apiEndpoint;
-            json.context.System.device.deviceId = this.device.id;
-        }
-
-        // If display enabled, we add a display object to context
-        if (this.device.displaySupported()) {
-            json.context.Display = {};
-        }
-
-        return json;
     }
-
 
     /**
      * Sends the request to the Alexa skill
@@ -244,7 +227,7 @@ export class VirtualAlexa {
         if ([RequestType.LAUNCH_REQUEST, RequestType.INTENT_REQUEST, RequestType.SESSION_ENDED_REQUEST,
             RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST, RequestType.CONNECTIONS_RESPONSE].includes(json.request.type)) {
             if (!this.session) {
-                this.newSession();
+                this.session = new SkillSession();
             }
             json.session = {
                 application: {
@@ -531,4 +514,52 @@ export interface AudioItem {
     readonly token: string;
     readonly expectedPreviousToken: string;
     readonly offsetInMilliseconds: number;
+}
+
+/**
+ * Information about the current open session on the Alexa emulator
+ */
+export class SkillSession {
+    attributes: {[id: string]: any} = {};
+    new = true;
+    id: string = "SessionID." + uuid.v4();
+}
+
+export class Device {
+    public readonly supportedInterfaces: any = {};
+
+    /** @internal */
+    public constructor(public id?: string) {
+        // By default, we support the AudioPlayer
+        this.audioPlayerSupported(true);
+    }
+
+    public generatedID(): void {
+        if (!this.id) {
+            this.id = "virtualAlexa.deviceID." + uuid.v4();
+        }
+    }
+
+    public audioPlayerSupported(value?: boolean): boolean {
+        return this.supportedInterface("AudioPlayer", value);
+    }
+
+    public displaySupported(value?: boolean): boolean {
+        return this.supportedInterface("Display", value);
+    }
+
+    public videoAppSupported(value?: boolean) {
+        return this.supportedInterface("VideoApp", value);
+    }
+
+    private supportedInterface(name: string, value?: boolean): boolean {
+        if (value !== undefined) {
+            if (value === true) {
+                this.supportedInterfaces[name] = {};
+            } else {
+                delete this.supportedInterfaces[name];
+            }
+        }
+        return this.supportedInterfaces[name];
+    }
 }
