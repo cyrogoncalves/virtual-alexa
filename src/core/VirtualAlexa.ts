@@ -100,14 +100,12 @@ export class VirtualAlexa {
 
         if (this.model.dialogIntent(intentName)) {
             // Update the request JSON to have the correct dialog state
-            json.request.dialogState = this.dialogManager.handleRequest();
+            json.request.dialogState = this.dialogManager._dialogState || "STARTED";
 
-            // Update the state of the slots in the dialog manager
-            this.dialogManager.updateSlotStates(json.request.intent.slots);
-
-            // Our slots can just be taken from the dialog manager now
-            //  It has the complete current state of the slot values for the dialog intent
-            json.request.intent.slots = this.dialogManager.slots();
+            // Update the state of the slots in the dialog manager.
+            // Our slots can just be taken from the dialog manager now.
+            //  It has the complete current state of the slot values for the dialog intent.
+            json.request.intent.slots = this.dialogManager.updateSlotStates(json.request.intent.slots);
         }
 
         slots && Object.entries(slots).forEach(([name, value]) => this.slot(json, name, value));
@@ -245,9 +243,7 @@ export class VirtualAlexa {
 
             // Anything other than IDLE, we send token and offset
             if (this.audioPlayer._activity !== AudioPlayerActivity.IDLE) {
-                const playing = this.audioPlayer.playingItem();
-                json.context.AudioPlayer.token = playing.token;
-                json.context.AudioPlayer.offsetInMilliseconds = playing.offsetInMilliseconds;
+                json.context.AudioPlayer = this.audioPlayer.playingItem();
             }
 
             // When the user utters an intent, we suspend for it
@@ -543,7 +539,7 @@ type DialogState = "COMPLETED" | "IN_PROGRESS" | "STARTED";
 
 export class DialogManager {
     private _confirmationStatus: ConfirmationStatus;
-    private _dialogState: DialogState;
+    public _dialogState: DialogState;
     private _slots: {[id: string]: {
             value: string,
             resolutions: string,
@@ -567,14 +563,6 @@ export class DialogManager {
         }
     }
 
-    /** @internal */
-    public handleRequest(): DialogState {
-        // Make sure the dialog state is set to started
-        if (!this._dialogState)
-            this._dialogState = "STARTED";
-        return this._dialogState;
-    }
-
     public reset() {
         this._confirmationStatus = undefined;
         this._dialogState = undefined;
@@ -588,20 +576,13 @@ export class DialogManager {
 
     /** @internal */
     public updateSlot(slotName: string, newSlot: any) {
-        const existingSlot = this._slots[slotName];
-
         // Update the slot value in the dialog manager if the intent has a new value
-        if (!existingSlot) {
-            this._slots[slotName] = newSlot;
-        } else if (newSlot.value) {
-            existingSlot.value = newSlot.value;
-            existingSlot.resolutions = newSlot.resolutions;
-            existingSlot.confirmationStatus = newSlot.confirmationStatus;
-        }
+        this._slots[slotName] = {...this._slots[slotName], ...newSlot};
     }
 
     /** @internal */
-    public updateSlotStates(slots: {[id: string]: any}): void {
+    public updateSlotStates(slots: {[id: string]: any}) {
         slots && Object.keys(slots).forEach(name => this.updateSlot(name, slots[name]));
+        return this._slots;
     }
 }
