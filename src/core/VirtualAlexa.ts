@@ -2,7 +2,6 @@ import { AddressAPI } from "../external/AddressAPI";
 import { DynamoDB } from "../external/DynamoDB";
 import { SkillInteractor } from "../interactor";
 import { InteractionModel } from "../model/InteractionModel";
-import { ConfirmationStatus, DialogManager } from "./SkillContext";
 import { SkillResponse } from "./SkillResponse";
 import { UserAPI } from "../external/UserAPI";
 import { VirtualAlexaBuilder } from '../builder';
@@ -26,11 +25,7 @@ export class VirtualAlexa {
     public readonly userId = "amzn1.ask.account." + uuid.v4();
 
     session: SkillSession;
-    public endSession2(): void {
-        this.dialogManager.reset();
-        this.session = undefined;
-    }
-    
+
     /** @internal */
     public constructor(
         /** @internal */
@@ -185,43 +180,45 @@ export class VirtualAlexa {
         return this.intend(intent, slots);
     }
 
-    private createRequestJson(): any {
-        // First create the header part of the request
-        return {
-            context: {
-                System: {
-                    application: {
-                        applicationId: this.applicationID,
-                    },
-                    device: {
-                        supportedInterfaces: this.device.supportedInterfaces,
-                        ...(this.device.id && { deviceId: this.device.id }),
-                    },
-                    user: {
-                        userId: this.userId,
-                        ...(this.device.id && { permissions: { consentToken: uuid.v4() } }),
-                        ...(this.accessToken && { accessToken: this.accessToken })
-                    },
-                    ...(this.device.id && { apiAccessToken: this.apiAccessToken, apiEndpoint: this.apiEndpoint }),
+    // First create the header part of the request
+    private createRequestJson = (): any => ({
+        context: {
+            System: {
+                application: {
+                    applicationId: this.applicationID,
                 },
-                ...(this.device.displaySupported() && {Display: {}})
+                device: {
+                    supportedInterfaces: this.device.supportedInterfaces,
+                    ...(this.device.id && {deviceId: this.device.id}),
+                },
+                user: {
+                    userId: this.userId,
+                    ...(this.device.id && {permissions: {consentToken: uuid.v4()}}),
+                    ...(this.accessToken && {accessToken: this.accessToken})
+                },
+                ...(this.device.id && {apiAccessToken: this.apiAccessToken, apiEndpoint: this.apiEndpoint}),
             },
-            request: {
-                locale: this.locale || "en-US",
-                requestId: "amzn1.echo-external.request." + uuid.v4(),
-                timestamp: new Date().toISOString().substring(0, 19) + "Z",
-            },
-            version: "1.0",
-        };
-    }
+            ...(this.device.supportedInterfaces["Display"] && {Display: {}})
+        },
+        request: {
+            locale: this.locale || "en-US",
+            requestId: "amzn1.echo-external.request." + uuid.v4(),
+            timestamp: new Date().toISOString().substring(0, 19) + "Z",
+        },
+        version: "1.0",
+    });
 
     /**
      * Sends the request to the Alexa skill
      */
     public async send(json: any): Promise<SkillResponse> {
-        // If we have a session, set the info
-        if ([RequestType.LAUNCH_REQUEST, RequestType.INTENT_REQUEST, RequestType.SESSION_ENDED_REQUEST,
-            RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST, RequestType.CONNECTIONS_RESPONSE].includes(json.request.type)) {
+        if ([
+            RequestType.LAUNCH_REQUEST,
+            RequestType.INTENT_REQUEST,
+            RequestType.SESSION_ENDED_REQUEST,
+            RequestType.DISPLAY_ELEMENT_SELECTED_REQUEST,
+            RequestType.CONNECTIONS_RESPONSE
+        ].includes(json.request.type)) {
             if (!this.session) {
                 this.session = new SkillSession();
             }
@@ -233,9 +230,7 @@ export class VirtualAlexa {
                 sessionId: this.session.id,
                 user: {
                     userId: this.userId,
-                    ...(this.device.id && { permissions: {
-                            consentToken: uuid.v4()
-                        }}),
+                    ...(this.device.id && { permissions: { consentToken: uuid.v4() } }),
                     ...(this.accessToken && { accessToken: this.accessToken })
                 },
                 ...(json.request.type !== RequestType.LAUNCH_REQUEST && { attributes: this.session.attributes })
@@ -243,7 +238,7 @@ export class VirtualAlexa {
         }
 
         // For intent, launch and session ended requests, send the audio player state if there is one
-        if (this.device.audioPlayerSupported()) {
+        if (this.device.supportedInterfaces["AudioPlayer"]) {
             json.context.AudioPlayer = {
                 playerActivity: AudioPlayerActivity[this.audioPlayer._activity],
             };
@@ -254,15 +249,15 @@ export class VirtualAlexa {
                 json.context.AudioPlayer.token = playing.token;
                 json.context.AudioPlayer.offsetInMilliseconds = playing.offsetInMilliseconds;
             }
-        }
 
-        // When the user utters an intent, we suspend for it
-        // We do this first to make sure everything is in the right state for what comes next
-        if (json.request.intent && this.device.audioPlayerSupported()) {
-            if (this.audioPlayer._activity === AudioPlayerActivity.PLAYING) {
-                this.audioPlayer._suspended = true;
-                this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
-                await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
+            // When the user utters an intent, we suspend for it
+            // We do this first to make sure everything is in the right state for what comes next
+            if (json.request.intent) {
+                if (this.audioPlayer._activity === AudioPlayerActivity.PLAYING) {
+                    this.audioPlayer._suspended = true;
+                    this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
+                    await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
+                }
             }
         }
 
@@ -271,42 +266,34 @@ export class VirtualAlexa {
         const result: any = await this._interactor.invoke(json);
 
         // If this was a session ended request, end the session in our internal state
-        if (json.request.type === "SessionEndedRequest") {
-            this.endSession2();
+        if (json.request.type === "SessionEndedRequest" || this.session && result?.response?.shouldEndSession) {
+            this.dialogManager.reset();
+            this.session = undefined;
         }
         if (this.session) {
             this.session.new = false;
-            if (result?.response?.shouldEndSession) {
-                this.endSession2();
-            } else if (result.sessionAttributes) {
-                this.session.attributes = result.sessionAttributes;
-            }
+            if (result.sessionAttributes) this.session.attributes = result.sessionAttributes;
         }
 
         if (result.response?.directives) {
-            for (const directive of result.response.directives) {
-                await this.handleAudioDirective(directive);
-            }
             // Update the dialog manager based on the results
             // Look for a dialog directive - trigger dialog mode if so
             for (const directive of result.response.directives) {
+                await this.handleAudioDirective(directive);
+
                 if (directive.type.startsWith("Dialog")) {
-                    if (directive.updatedIntent && !this.model.dialogIntent(directive.updatedIntent.name)) {
+                    if (directive.updatedIntent && !this.model.dialogIntent(directive.updatedIntent.name))
                         throw new Error("No match for dialog name: " + directive.updatedIntent.name);
-                    }
                     this.dialogManager.handleDirective(directive);
                 }
             }
         }
-
         // Resume the audio player, if suspended
-        if (json.request.intent && this.device.audioPlayerSupported()) {
-            if (this.audioPlayer._suspended) {
-                this.audioPlayer._suspended = false;
-                if (this.audioPlayer._activity !== AudioPlayerActivity.PLAYING) {
-                    this.audioPlayer._activity = AudioPlayerActivity.PLAYING;
-                    await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED);
-                }
+        if (json.request.intent && this.device.supportedInterfaces["AudioPlayer"] && this.audioPlayer._suspended) {
+            this.audioPlayer._suspended = false;
+            if (this.audioPlayer._activity !== AudioPlayerActivity.PLAYING) {
+                this.audioPlayer._activity = AudioPlayerActivity.PLAYING;
+                await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED);
             }
         }
 
@@ -522,40 +509,99 @@ export class SkillSession {
 }
 
 export class Device {
-    public readonly supportedInterfaces: any = {};
+    public readonly supportedInterfaces: {
+        [k in "AudioPlayer" | "Display" | "VideoApp"]?: null| {}
+    } = {
+        "AudioPlayer": {} // By default, we support the AudioPlayer
+    };
 
     /** @internal */
-    public constructor(public id?: string) {
-        // By default, we support the AudioPlayer
-        this.audioPlayerSupported(true);
-    }
+    public constructor(public id?: string) {}
 
     public generatedID(): void {
-        if (!this.id) {
-            this.id = "virtualAlexa.deviceID." + uuid.v4();
+        if (!this.id) this.id = "virtualAlexa.deviceID." + uuid.v4();
+    }
+
+    public audioPlayerSupported = (value: boolean) => this.supportedInterface("AudioPlayer", value);
+
+    public displaySupported = (value: boolean) => this.supportedInterface("Display", value);
+
+    public videoAppSupported = (value: boolean) => this.supportedInterface("VideoApp", value);
+
+    private supportedInterface(name: "AudioPlayer" | "Display" | "VideoApp", value: boolean): void {
+        value ? this.supportedInterfaces[name] = {} : delete this.supportedInterfaces[name];
+    }
+}
+
+enum ConfirmationStatus {
+    CONFIRMED = "CONFIRMED",
+    DENIED = "DENIED",
+    NONE = "NONE",
+}
+
+type DialogState = "COMPLETED" | "IN_PROGRESS" | "STARTED";
+
+export class DialogManager {
+    private _confirmationStatus: ConfirmationStatus;
+    private _dialogState: DialogState;
+    private _slots: {[id: string]: {
+            value: string,
+            resolutions: string,
+            confirmationStatus: string,
+        }} = {};
+
+    /** @internal */
+    public handleDirective(directive: any): void {
+        this._dialogState = this._dialogState ? "IN_PROGRESS" : "STARTED";
+
+        if (directive.type === "Dialog.Delegate") {
+            this._confirmationStatus = ConfirmationStatus.NONE;
+        } else if (["Dialog.ElicitSlot", "Dialog.ConfirmSlot", "Dialog.ConfirmIntent"].includes(directive.type)) {
+            // Start the dialog if not started, otherwise mark as in progress
+            if (!this._confirmationStatus)
+                this._confirmationStatus = ConfirmationStatus.NONE;
+            if (directive.updatedIntent)
+                this.updateSlotStates(directive.updatedIntent.slots);
+            if (directive.type === "Dialog.ConfirmIntent")
+                this._dialogState = "COMPLETED";
         }
     }
 
-    public audioPlayerSupported(value?: boolean): boolean {
-        return this.supportedInterface("AudioPlayer", value);
+    /** @internal */
+    public handleRequest(): DialogState {
+        // Make sure the dialog state is set to started
+        if (!this._dialogState)
+            this._dialogState = "STARTED";
+        return this._dialogState;
     }
 
-    public displaySupported(value?: boolean): boolean {
-        return this.supportedInterface("Display", value);
+    public reset() {
+        this._confirmationStatus = undefined;
+        this._dialogState = undefined;
+        this._slots = {};
     }
 
-    public videoAppSupported(value?: boolean) {
-        return this.supportedInterface("VideoApp", value);
+    /** @internal */
+    public slots() {
+        return this._slots;
     }
 
-    private supportedInterface(name: string, value?: boolean): boolean {
-        if (value !== undefined) {
-            if (value === true) {
-                this.supportedInterfaces[name] = {};
-            } else {
-                delete this.supportedInterfaces[name];
-            }
+    /** @internal */
+    public updateSlot(slotName: string, newSlot: any) {
+        const existingSlot = this._slots[slotName];
+
+        // Update the slot value in the dialog manager if the intent has a new value
+        if (!existingSlot) {
+            this._slots[slotName] = newSlot;
+        } else if (newSlot.value) {
+            existingSlot.value = newSlot.value;
+            existingSlot.resolutions = newSlot.resolutions;
+            existingSlot.confirmationStatus = newSlot.confirmationStatus;
         }
-        return this.supportedInterfaces[name];
+    }
+
+    /** @internal */
+    public updateSlotStates(slots: {[id: string]: any}): void {
+        slots && Object.keys(slots).forEach(name => this.updateSlot(name, slots[name]));
     }
 }
