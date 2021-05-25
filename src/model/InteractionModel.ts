@@ -98,7 +98,14 @@ export class InteractionModel {
             throw new Error("Unable to match utterance: " + utterance
                 + " to an intent. Try a different utterance, or explicitly set the intent");
         }
-        return topMatch;
+
+        const { intent, slots, slotNames } = topMatch;
+        const json = slots?.reduce((json: any, slot: string, i: number) => {
+            json[slotNames[i]] = slot.trim();
+            return json;
+        }, {}) ?? {};
+
+        return { intent, slots: json };
     }
 
     public dialogIntent(intentName: string): DialogIntent {

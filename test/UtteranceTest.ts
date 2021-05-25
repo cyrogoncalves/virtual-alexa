@@ -124,11 +124,9 @@ describe("UtteranceTest", function() {
         });
 
         it("Matches a slotted phrase", () => {
-            const { slots, intent, slotNames } = model.utterance("slot value");
+            const { slots, intent } = model.utterance("slot value");
             assert.equal(intent, "SlottedIntent");
-            assert.equal(slots?.[0]?.trim(), "value");
-            const index = slotIndex(slotNames, "SlotName");
-            assert.equal(slots?.[index]?.trim(), "value");
+            assert.equal(slots?.["SlotName"], "value");
         });
 
         it("Matches a slotted phrase, no slot value", () => {
@@ -137,32 +135,23 @@ describe("UtteranceTest", function() {
         });
 
         it("Matches a phrase with multiple slots", () => {
-            const { slotNames, slots, intent } = model.utterance("multiple a and b");
+            const { slots, intent } = model.utterance("multiple a and b");
             assert.equal(intent, "MultipleSlots");
-            assert.equal(slots?.[0]?.trim(), "a");
-            assert.equal(slots?.[1]?.trim(), "b");
-            const indexA = slotIndex(slotNames, "SlotA");
-            assert.equal(slots?.[indexA]?.trim(), "a");
-            const indexB = slotIndex(slotNames, "SlotB");
-            assert.equal(slots?.[indexB]?.trim(), "b");
+            assert.equal(slots?.["SlotA"], "a");
+            assert.equal(slots?.["SlotB"], "b");
         });
 
         it("Matches a phrase with multiple slots reversed", () => {
-            const { slotNames, slots, intent } = model.utterance("reversed a then b");
+            const { slots, intent } = model.utterance("reversed a then b");
             assert.equal(intent, "MultipleSlots");
-            assert.equal(slots?.[0]?.trim(), "a");
-            assert.equal(slots?.[1]?.trim(), "b");
-            const indexA = slotIndex(slotNames, "SlotA");
-            assert.equal(slots?.[indexA]?.trim(), "b");
-            const indexB = slotIndex(slotNames, "SlotB");
-            assert.equal(slots?.[indexB]?.trim(), "a");
+            assert.equal(slots?.["SlotA"], "b");
+            assert.equal(slots?.["SlotB"], "a");
         });
 
         it("Matches a phrase with slot with enumerated values", () => {
-            const { slotNames, slots, intent } = model.utterance("US");
+            const { slots, intent } = model.utterance("US");
             assert.equal(intent, "CustomSlot");
-            assert.equal(slots?.[0]?.trim(), "US");
-            assert.equal(slots?.[slotIndex(slotNames, "country")]?.trim(), "US");
+            assert.equal(slots?.["country"], "US");
         });
 
         it("Does not match a phrase with slot with enumerated values", () => {
@@ -171,25 +160,21 @@ describe("UtteranceTest", function() {
         });
 
         it("Matches a phrase with slot with number value", () => {
-            const { slotNames, slots, intent } = model.utterance("19801");
+            const { slots, intent } = model.utterance("19801");
             assert.equal(intent, "NumberSlot");
-            assert.equal(slots?.[0]?.trim(), "19801");
-            assert.equal(slots?.[slotIndex(slotNames, "number")]?.trim(), "19801");
+            assert.equal(slots?.["number"], "19801");
         });
 
         it("Matches a phrase with slot with long-form number value", () => {
-            const { slotNames, slots, intent } = model.utterance("one");
+            const { slots, intent } = model.utterance("one");
             assert.equal(intent, "NumberSlot");
-            assert.equal(slots?.[0]?.trim(), "one");
-            assert.equal(slots?.[slotIndex(slotNames, "number")]?.trim(), "one");
+            assert.equal(slots?.["number"], "one");
 
             const utterance2 = model.utterance("Thirteen");
-            const utterance2index = slotIndex(utterance2.slotNames, "number");
-            assert.equal(utterance2.slots?.[utterance2index]?.trim(), "Thirteen");
+            assert.equal(utterance2.slots?.["number"], "Thirteen");
 
             const utterance3 = model.utterance(" ten ");
-            const utterance3index = slotIndex(utterance3.slotNames, "number");
-            assert.equal(utterance3.slots?.[utterance3index]?.trim(), "ten");
+            assert.equal(utterance3.slots?.["number"], "ten");
         });
 
         it("Does not match a phrase with numbers and letters to slot of number type", () => {

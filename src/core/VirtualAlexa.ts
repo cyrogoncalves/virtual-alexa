@@ -169,7 +169,7 @@ export class VirtualAlexa {
      */
     public utter(utteranceString: string): Promise<SkillResponse> {
         if (utteranceString === "exit") {
-            return this.endSession(SessionEndedReason.USER_INITIATED);
+            return this.endSession();
         }
 
         let resolvedUtterance = utteranceString;
@@ -181,12 +181,8 @@ export class VirtualAlexa {
             resolvedUtterance = result[1];
         }
 
-        const { slots, intent, slotNames } = this.model.utterance(resolvedUtterance);
-        const json = slots?.reduce((json: any, slot: string, i: number) => {
-            json[slotNames[i]] = slot.trim();
-            return json;
-        }, {}) ?? {};
-        return this.intend(intent, json);
+        const { intent, slots } = this.model.utterance(resolvedUtterance);
+        return this.intend(intent, slots);
     }
 
     private createRequestJson(): any {

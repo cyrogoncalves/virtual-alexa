@@ -13,84 +13,47 @@ export class DynamoDB {
     private region = "us-east-1";
 
     public mock() {
-        this.setEnv();
+        if (process.env.AWS_REGION)
+            this.region = process.env.AWS_REGION || "us-east-1";
+        process.env["AWS_REGION"] = process.env["AWS_REGION"] || "us-east-1";
+        process.env["AWS_ACCESS_KEY_ID"] = process.env["AWS_ACCESS_KEY_ID"] || "123456789";
+        process.env["AWS_SECRET_ACCESS_KEY"] = process.env["AWS_SECRET_ACCESS_KEY"] || "123456789";
+
         if (!nock.isActive()) {
             nock.activate();
         }
 
-        this.mockPut();
-        this.mockGet();
-        this.mockCreate();
+        const baseUrl = `https://dynamodb.${this.region}.amazonaws.com:443`;
+        this.mockPut(baseUrl);
+        this.mockGet(baseUrl);
+        this.mockCreate(baseUrl);
     }
 
     public reset() {
         this.records = [];
-        if (DynamoDB.getScope) {
-            DynamoDB.getScope.persist(false);
-        }
-
-        if (DynamoDB.putScope) {
-            DynamoDB.putScope.persist(false);
-        }
-
-        if (DynamoDB.createScope) {
-            DynamoDB.createScope.persist(false);
-        }
+        DynamoDB.getScope?.persist(false);
+        DynamoDB.putScope?.persist(false);
+        DynamoDB.createScope?.persist(false);
     }
 
-    private setEnv() {
-        if (process.env.AWS_REGION) {
-            this.region = process.env.AWS_REGION;
-        }
-        this.setDefault("AWS_REGION", "us-east-1");
-        this.setDefault("AWS_ACCESS_KEY_ID", "123456789");
-        this.setDefault("AWS_SECRET_ACCESS_KEY", "123456789");
-    }
-
-    private setDefault(property: string, value: string) {
-        process.env[property] = process.env[property] ? process.env[property] : value;
-    }
-
+    // Go through records in reverse order, as we may have duplicates for a key.
+    // We want to get the latest.
+    // The key is an object, with potentially multiple fields. They each need to match.
     private fetchImpl(table: string, key: any): any | undefined {
-        // Go through records in reverse order, as we may have duplicates for a key
-        // We want to get the latest
-        for (let i = this.records.length - 1; i >= 0; i--) {
-            const record = this.records[i];
-            if (record.TableName !== table) {
-                continue;
-            }
-
-            const o = this.simplifyRecord(record.Item);
-            // The key is an object, with potentially multiple fields
-            // They each need to match
-            let match = true;
-            for (const keyPart of Object.keys(key)) {
-                const keyPartValue = key[keyPart];
-                if (o[keyPart] && o[keyPart] === keyPartValue) {
-                    continue;
-                }
-
-                match = false;
-                break;
-            }
-
-            if (match) {
-                return record;
-            }
-        }
-        return undefined;
+        return this.records.reverse().filter(r => r.TableName === table).find(record => {
+            const o = AWS.DynamoDB.Converter.unmarshall(record.Item);
+            return Object.keys(key).every(keyPart => o[keyPart] && o[keyPart] === key[keyPart]);
+        });
     }
 
-    private mockPut() {
+    private mockPut(baseUrl: string) {
         // const baseURL = new RegExp(".*dynamodb.*");
         // Built this based on this info:
         //  https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html#API_PutItem_Examples
-        DynamoDB.putScope = nock(this.baseURL())
-            .matchHeader("x-amz-target", (value: string) => {
-                return value.endsWith("PutItem");
-            })
+        DynamoDB.putScope = nock(baseUrl)
+            .matchHeader("x-amz-target", value => value.endsWith("PutItem"))
             .persist()
-            .post("/", (body: any) => {
+            .post("/", body => {
                 this.records.push(body);
                 return true;
             })
@@ -98,59 +61,35 @@ export class DynamoDB {
             .reply(200, JSON.stringify({}));
     }
 
-    private mockGet() {
+    private mockGet(baseUrl: string) {
         // Built this based on this info:
         //  https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html#API_PutItem_Examples
-        DynamoDB.getScope = nock(this.baseURL())
-            .matchHeader("x-amz-target", (value: string) => {
-                return value.endsWith("GetItem");
-            })
+        DynamoDB.getScope = nock(baseUrl)
+            .matchHeader("x-amz-target", value => value.endsWith("GetItem"))
             .persist()
-            .post("/", (body: any) => {
-                return true;
-            })
+            .post("/", () => true)
             .query(true)
             .reply(200, (uri: string, requestBody: any) => {
                 const requestObject = JSON.parse(requestBody);
-                const key = requestObject.Key;
                 // Turn this into a regular javascript object - we use this for searching
-                const keySimple = this.simplifyRecord(key);
-                let record = this.fetchImpl(requestObject.TableName, keySimple);
-                if (!record) {
-                    record = {};
-                }
-                return record;
+                const keySimple = AWS.DynamoDB.Converter.unmarshall(requestObject.Key);
+                return this.fetchImpl(requestObject.TableName, keySimple) || {};
             });
     }
 
-    private mockCreate() {
+    private mockCreate(baseUrl: string) {
         // Built this based on this info:
         //  https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_CreateTable.html
         // Basically, create table calls return with the table info plus a status of CREATING
-        DynamoDB.createScope = nock(this.baseURL())
-            .matchHeader("x-amz-target", (value: string) => {
-                return value.endsWith("CreateTable");
-            })
+        DynamoDB.createScope = nock(baseUrl)
+            .matchHeader("x-amz-target", value => value.endsWith("CreateTable"))
             .persist()
-            .post("/", (body: any) => {
-                return true;
-            })
+            .post("/", () => true)
             .query(true)
             .reply(200, (uri: string, requestBody: any) => {
                 const bodyJSON = JSON.parse(requestBody);
-                const response = {
-                    TableDescription: bodyJSON,
-                };
-                response.TableDescription.TableStatus =  "CREATING";
-                return response;
+                bodyJSON.TableStatus =  "CREATING";
+                return { TableDescription: bodyJSON };
             });
-    }
-
-    private baseURL() {
-        return "https://dynamodb." + this.region + ".amazonaws.com:443";
-    }
-
-    private simplifyRecord(dynamoObject: any) {
-        return AWS.DynamoDB.Converter.unmarshall(dynamoObject);
     }
 }

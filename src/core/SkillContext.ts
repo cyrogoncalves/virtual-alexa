@@ -5,11 +5,7 @@ export enum ConfirmationStatus {
     NONE = "NONE",
 }
 
-export enum DialogState {
-    COMPLETED = "COMPLETED",
-    IN_PROGRESS = "IN_PROGRESS",
-    STARTED = "STARTED",
-}
+type DialogState = "COMPLETED" | "IN_PROGRESS" | "STARTED";
 
 export class DialogManager {
     private _confirmationStatus: ConfirmationStatus;
@@ -22,23 +18,18 @@ export class DialogManager {
 
     /** @internal */
     public handleDirective(directive: any): void {
-        this._dialogState = this._dialogState ? DialogState.IN_PROGRESS : DialogState.STARTED;
+        this._dialogState = this._dialogState ? "IN_PROGRESS" : "STARTED";
 
         if (directive.type === "Dialog.Delegate") {
             this._confirmationStatus = ConfirmationStatus.NONE;
         } else if (["Dialog.ElicitSlot", "Dialog.ConfirmSlot", "Dialog.ConfirmIntent"].includes(directive.type)) {
             // Start the dialog if not started, otherwise mark as in progress
-            if (!this._confirmationStatus) {
+            if (!this._confirmationStatus)
                 this._confirmationStatus = ConfirmationStatus.NONE;
-            }
-
-            if (directive.updatedIntent) {
+            if (directive.updatedIntent)
                 this.updateSlotStates(directive.updatedIntent.slots);
-            }
-
-            if (directive.type === "Dialog.ConfirmIntent") {
-                this._dialogState = DialogState.COMPLETED;
-            }
+            if (directive.type === "Dialog.ConfirmIntent")
+                this._dialogState = "COMPLETED";
         }
     }
 
@@ -56,9 +47,8 @@ export class DialogManager {
     /** @internal */
     public handleRequest(): DialogState {
         // Make sure the dialog state is set to started
-        if (!this._dialogState) {
-            this._dialogState = DialogState.STARTED;
-        }
+        if (!this._dialogState)
+            this._dialogState = "STARTED";
         return this._dialogState;
     }
 
@@ -83,9 +73,8 @@ export class DialogManager {
      * @param state
      */
     public state(state?: DialogState) {
-        if (state) {
+        if (state)
             this._dialogState = state;
-        }
         return this._dialogState;
     }
 
@@ -96,7 +85,7 @@ export class DialogManager {
         // Update the slot value in the dialog manager if the intent has a new value
         if (!existingSlot) {
             this._slots[slotName] = newSlot;
-        } else if (existingSlot && newSlot.value) {
+        } else if (newSlot.value) {
             existingSlot.value = newSlot.value;
             existingSlot.resolutions = newSlot.resolutions;
             existingSlot.confirmationStatus = newSlot.confirmationStatus;
@@ -105,14 +94,11 @@ export class DialogManager {
 
     /** @internal */
     public updateSlotStates(slots: {[id: string]: any}): void {
-        if (!slots) {
-            return;
-        }
-
-        //console.log("DIALOG SLOT PRE: " + JSON.stringify(slots, null, 2));
-        for (const slotName of Object.keys(slots)) {
-            const newSlot = slots[slotName];
-            this.updateSlot(slotName, newSlot);
+        if (slots) {
+            for (const slotName of Object.keys(slots)) {
+                const newSlot = slots[slotName];
+                this.updateSlot(slotName, newSlot);
+            }
         }
     }
 }
