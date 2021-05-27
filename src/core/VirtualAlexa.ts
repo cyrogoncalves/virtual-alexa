@@ -62,13 +62,7 @@ export class VirtualAlexa {
      */
     public endSession(sessionEndedReason = SessionEndedReason.USER_INITIATED,
             errorData?: any): Promise<SkillResponse> {
-        const json = this.createRequestJson();
-        json.request.type = RequestType.SESSION_ENDED_REQUEST;
-        json.request.reason = sessionEndedReason;
-        if (errorData) {
-            json.request.error = errorData;
-        }
-        return this.send(json);
+        return this.send(this.createEndSessionRequest(sessionEndedReason, errorData));
     }
 
     /**
@@ -100,7 +94,7 @@ export class VirtualAlexa {
 
         if (this.model.dialogIntent(intentName)) {
             // Update the request JSON to have the correct dialog state
-            json.request.dialogState = this.dialogManager._dialogState || "STARTED";
+            json.request.dialogState = this.dialogManager.dialogState || "STARTED";
 
             // Update the state of the slots in the dialog manager.
             // Our slots can just be taken from the dialog manager now.
@@ -196,7 +190,11 @@ export class VirtualAlexa {
                 },
                 ...(this.device.id && {apiAccessToken: this.apiAccessToken, apiEndpoint: this.apiEndpoint}),
             },
-            ...(this.device.supportedInterfaces["Display"] && {Display: {}})
+            ...(this.device.supportedInterfaces["Display"] && {Display: {}}),
+            ...(this.device.supportedInterfaces["AudioPlayer"] && {
+                AudioPlayer: this.audioPlayer._activity !== AudioPlayerActivity.IDLE
+                    ? this.audioPlayer.playingItem() : {playerActivity: AudioPlayerActivity.IDLE}
+            })
         },
         request: {
             locale: this.locale || "en-US",
@@ -235,26 +233,13 @@ export class VirtualAlexa {
             };
         }
 
-        // For intent, launch and session ended requests, send the audio player state if there is one
-        if (this.device.supportedInterfaces["AudioPlayer"]) {
-            json.context.AudioPlayer = {
-                playerActivity: AudioPlayerActivity[this.audioPlayer._activity],
-            };
-
-            // Anything other than IDLE, we send token and offset
-            if (this.audioPlayer._activity !== AudioPlayerActivity.IDLE) {
-                json.context.AudioPlayer = this.audioPlayer.playingItem();
-            }
-
-            // When the user utters an intent, we suspend for it
-            // We do this first to make sure everything is in the right state for what comes next
-            if (json.request.intent) {
-                if (this.audioPlayer._activity === AudioPlayerActivity.PLAYING) {
-                    this.audioPlayer._suspended = true;
-                    this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
-                    await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
-                }
-            }
+        // When the user utters an intent, we suspend for it
+        // We do this first to make sure everything is in the right state for what comes next
+        if (this.device.supportedInterfaces["AudioPlayer"] && json.request.intent
+                && this.audioPlayer._activity === AudioPlayerActivity.PLAYING) {
+            this.audioPlayer._suspended = true;
+            this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
+            await this.send(this.createAudioRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED));
         }
 
         this.requestFilter?.(json);
@@ -275,7 +260,8 @@ export class VirtualAlexa {
             // Update the dialog manager based on the results
             // Look for a dialog directive - trigger dialog mode if so
             for (const directive of result.response.directives) {
-                await this.handleAudioDirective(directive);
+                const requests = this.handleAudioDirective(directive);
+                for (let request of requests) await this.send(request);
 
                 if (directive.type.startsWith("Dialog")) {
                     if (directive.updatedIntent && !this.model.dialogIntent(directive.updatedIntent.name))
@@ -289,19 +275,19 @@ export class VirtualAlexa {
             this.audioPlayer._suspended = false;
             if (this.audioPlayer._activity !== AudioPlayerActivity.PLAYING) {
                 this.audioPlayer._activity = AudioPlayerActivity.PLAYING;
-                await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED);
+                await this.send(this.createAudioRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED));
             }
         }
 
         return new SkillResponse(result);
     }
 
-    private audioPlayerRequest(requestType: string) {
+    private createAudioRequest(requestType: string) {
         const json = this.createRequestJson();
         json.request.type = requestType;
         json.request.token = this.audioPlayer.playingItem().token;
         json.request.offsetInMilliseconds = this.audioPlayer.playingItem().offsetInMilliseconds;
-        return this.send(json);
+        return json;
     }
 
 
@@ -368,14 +354,16 @@ export class VirtualAlexa {
         return this;
     }
 
-    private async handleAudioDirective(directive: any): Promise<any> {
+    private handleAudioDirective(directive: any) {
+        const requests = [];
         if (directive.type === "AudioPlayer.Play") {
             if (directive.playBehavior === "ENQUEUE") {
                 this.audioPlayer._queue.push(directive.audioItem.stream);
             } else if (directive.playBehavior === "REPLACE_ALL") {
                 if (this.audioPlayer._activity === AudioPlayerActivity.PLAYING) {
                     this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
-                    await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
+                    // requests.push(this.createAudioRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED));
+                    requests.push(this.createAudioRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED));
                 }
                 this.audioPlayer._queue = [directive.audioItem.stream];
             } else if (directive.playBehavior === "REPLACE_ENQUEUED") {
@@ -385,27 +373,40 @@ export class VirtualAlexa {
             if (this.audioPlayer._activity !== AudioPlayerActivity.PLAYING && this.audioPlayer._queue.length !== 0) {
                 // dequeue
                 if (!this.audioPlayer._queue[0].url) {
-                    return this.endSession(SessionEndedReason.ERROR, {
+                    requests.push(this.createEndSessionRequest(SessionEndedReason.ERROR, {
                         message: "The URL specified in the Play directive must be defined and a valid HTTPS url",
                         type: "INVALID_RESPONSE",
-                    });
+                    }));
                 } else if (this.audioPlayer._queue[0].url.startsWith("http:")) {
-                    return this.endSession(SessionEndedReason.ERROR, {
+                    requests.push(this.createEndSessionRequest(SessionEndedReason.ERROR, {
                         message: "The URL specified in the Play directive must be HTTPS",
                         type: "INVALID_RESPONSE",
-                    });
+                    }));
+                } else {
+                    this.audioPlayer._activity = AudioPlayerActivity.PLAYING;
+                    requests.push(this.createAudioRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED));
                 }
-                this.audioPlayer._activity = AudioPlayerActivity.PLAYING;
-                return this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STARTED);
             }
         } else if (directive.type === "AudioPlayer.Stop") {
             if (this.audioPlayer._suspended) {
                 this.audioPlayer._suspended = false;
             } else if (this.audioPlayer.playingItem()) {
                 this.audioPlayer._activity = AudioPlayerActivity.STOPPED;
-                await this.audioPlayerRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED);
+                requests.push(this.createAudioRequest(RequestType.AUDIO_PLAYER_PLAYBACK_STOPPED));
             }
         }
+        return requests;
+    }
+
+    private createEndSessionRequest(
+        sessionEndedReason = SessionEndedReason.USER_INITIATED,
+        errorData?: { message: string, type: string }
+    ) {
+        const json = this.createRequestJson();
+        json.request.type = RequestType.SESSION_ENDED_REQUEST;
+        json.request.reason = sessionEndedReason;
+        if (errorData) json.request.error = errorData;
+        return json;
     }
 }
 
@@ -539,8 +540,8 @@ type DialogState = "COMPLETED" | "IN_PROGRESS" | "STARTED";
 
 export class DialogManager {
     private _confirmationStatus: ConfirmationStatus;
-    public _dialogState: DialogState;
-    private _slots: {[id: string]: {
+    public dialogState: DialogState;
+    public slots: {[id: string]: {
             value: string,
             resolutions: string,
             confirmationStatus: string,
@@ -548,7 +549,7 @@ export class DialogManager {
 
     /** @internal */
     public handleDirective(directive: any): void {
-        this._dialogState = this._dialogState ? "IN_PROGRESS" : "STARTED";
+        this.dialogState = this.dialogState ? "IN_PROGRESS" : "STARTED";
 
         if (directive.type === "Dialog.Delegate") {
             this._confirmationStatus = ConfirmationStatus.NONE;
@@ -559,30 +560,25 @@ export class DialogManager {
             if (directive.updatedIntent)
                 this.updateSlotStates(directive.updatedIntent.slots);
             if (directive.type === "Dialog.ConfirmIntent")
-                this._dialogState = "COMPLETED";
+                this.dialogState = "COMPLETED";
         }
     }
 
     public reset() {
         this._confirmationStatus = undefined;
-        this._dialogState = undefined;
-        this._slots = {};
-    }
-
-    /** @internal */
-    public slots() {
-        return this._slots;
+        this.dialogState = undefined;
+        this.slots = {};
     }
 
     /** @internal */
     public updateSlot(slotName: string, newSlot: any) {
         // Update the slot value in the dialog manager if the intent has a new value
-        this._slots[slotName] = {...this._slots[slotName], ...newSlot};
+        this.slots[slotName] = {...this.slots[slotName], ...newSlot};
     }
 
     /** @internal */
     public updateSlotStates(slots: {[id: string]: any}) {
         slots && Object.keys(slots).forEach(name => this.updateSlot(name, slots[name]));
-        return this._slots;
+        return this.slots;
     }
 }
